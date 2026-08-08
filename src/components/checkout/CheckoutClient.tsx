@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { useCart, cartSubtotalPaise } from '@/store/cart'
 import { formatPaise } from '@/lib/format'
 import { INDIAN_STATES, shippingPaiseForState } from '@/lib/shipping'
+import { trackInitiateCheckout } from '@/lib/analytics'
 
 interface RazorpayCheckout {
   keyId: string
@@ -222,6 +223,18 @@ export default function CheckoutClient() {
         return
       }
       setPendingOrder(data)
+      // Fired here, not on page load: this is the moment the customer actually
+      // reaches the payment screen, which makes it the funnel step that pairs
+      // with Purchase and exposes the payment-abandonment gap.
+      trackInitiateCheckout(
+        items.map((i) => ({
+          id: i.productId,
+          name: i.name,
+          pricePaise: i.unitPricePaise,
+          qty: i.qty,
+        })),
+        data.subtotalPaise
+      )
       if (data.razorpay) {
         // Real gateway: open the Razorpay checkout modal.
         await openRazorpay(data)

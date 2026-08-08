@@ -3,6 +3,9 @@ import { Cormorant_Garamond, Lato, Pinyon_Script } from "next/font/google";
 import "./globals.css";
 import SmoothScroll from "@/components/layout/SmoothScroll";
 import CartHydration from "@/components/cart/CartHydration";
+import MarketingAnalytics from "@/components/analytics/MarketingAnalytics";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION, SITE_URL } from "@/lib/data";
 
 const cormorant = Cormorant_Garamond({
@@ -114,6 +117,11 @@ export default function RootLayout({
         <SmoothScroll>
           {children}
         </SmoothScroll>
+        {/* Meta Pixel + GA4 (each no-ops without its id); Vercel visitor stats
+            and Core Web Vitals. */}
+        <MarketingAnalytics />
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

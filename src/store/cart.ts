@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { effectivePricePaise, type Product } from '@/lib/data'
+import { trackAddToCart } from '@/lib/analytics'
 
 /**
  * Cart items snapshot the product at add time (name, price, image), so the
@@ -32,7 +33,19 @@ export const useCart = create<CartState>()(
       items: [],
       drawerOpen: false,
 
-      add: (product, qty = 1) =>
+      add: (product, qty = 1) => {
+        // Tracked here rather than at the call sites: this is the one place
+        // that definitionally means "added to cart", so ProductCard, the PDP
+        // and any future entry point are covered without remembering to.
+        trackAddToCart(
+          {
+            id: product.id,
+            name: product.name,
+            pricePaise: effectivePricePaise(product),
+            category: product.category,
+          },
+          qty
+        )
         set((state) => {
           const existing = state.items.find((i) => i.productId === product.id)
           const items = existing
@@ -51,7 +64,8 @@ export const useCart = create<CartState>()(
                 },
               ]
           return { items, drawerOpen: true }
-        }),
+        })
+      },
 
       remove: (productId) =>
         set((state) => ({

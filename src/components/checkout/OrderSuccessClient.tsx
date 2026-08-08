@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -8,6 +8,7 @@ import { CheckCircle2, Mail, PackageCheck, Truck } from 'lucide-react'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { formatPaise } from '@/lib/format'
+import { claimPurchaseTracking, trackPurchase } from '@/lib/analytics'
 
 interface StoredOrderItem {
   productId: string
@@ -57,6 +58,25 @@ export default function OrderSuccessClient() {
       return null
     }
   }, [raw])
+
+  // Meta Purchase / GA4 purchase: the event ad delivery optimises against and
+  // the only one that reports revenue back to the ads dashboard. The order
+  // stays in sessionStorage, so this page happily re-renders on a refresh or a
+  // back-navigation; claimPurchaseTracking() makes sure the sale is counted
+  // exactly once.
+  useEffect(() => {
+    if (!order || !claimPurchaseTracking(order.id)) return
+    trackPurchase(
+      order.id,
+      order.items.map((i) => ({
+        id: i.productId,
+        name: i.name,
+        pricePaise: i.unitPricePaise,
+        qty: i.qty,
+      })),
+      order.totalPaise
+    )
+  }, [order])
 
   if (!hydrated) {
     return (

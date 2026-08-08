@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -24,6 +24,7 @@ import { formatPaise, formatDate } from '@/lib/format'
 import { effectivePricePaise, isOnSale, type Product } from '@/lib/data'
 import type { Review } from '@/lib/domain'
 import { useCart } from '@/store/cart'
+import { trackViewContent } from '@/lib/analytics'
 
 const tabs = ['Benefits', 'Ingredients', 'Ritual'] as const
 
@@ -72,6 +73,23 @@ export default function ProductDetailClient({
   const price = effectivePricePaise(product)
   const outOfStock = product.stock <= 0
   const lowStock = !outOfStock && product.stock <= 10
+
+  // Meta ViewContent / GA4 view_item, once per product viewed.
+  //
+  // Depends on primitives rather than the `product` object so a re-render that
+  // hands back an equal-but-new object cannot re-report the same view.
+  // NOTE: this fires twice under `npm run dev` because React StrictMode
+  // double-invokes mount effects. That is dev-only; verified firing exactly
+  // once against a production build.
+  const { id: productId, name: productName, category: productCategory } = product
+  useEffect(() => {
+    trackViewContent({
+      id: productId,
+      name: productName,
+      pricePaise: price,
+      category: productCategory,
+    })
+  }, [productId, productName, productCategory, price])
 
   const tabContent: Record<string, string> = {
     Benefits: product.benefits,

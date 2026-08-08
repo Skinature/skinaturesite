@@ -51,18 +51,35 @@ export default function PrivacyPolicyPage() {
             <strong className="text-forest-900">Delivery:</strong> our courier partners,
             to ship your order (name, address, phone)
           </li>
+          <li>
+            <strong className="text-forest-900">Analytics &amp; advertising:</strong>{' '}
+            Meta (Facebook and Instagram), Google Analytics, and our hosting provider
+            Vercel, who receive activity on this site such as pages viewed and order
+            value so we can measure traffic and ad performance
+          </li>
         </ul>
         <p>
           We never sell your personal information to anyone.
         </p>
       </PolicySection>
 
-      <PolicySection heading="Cookies & Local Storage">
+      <PolicySection heading="Cookies, Local Storage & Analytics">
         <p>
           The site uses your browser&apos;s local storage to remember your shopping
-          cart between visits. We do not use invasive tracking cookies. If we adopt
-          analytics in future, it will be privacy-respecting and this policy will be
-          updated.
+          cart between visits.
+        </p>
+        <p>
+          We also use analytics and advertising measurement tools to understand how
+          the site is used and how well our ads work. These may set cookies or
+          similar identifiers in your browser, and they record things like the pages
+          you view, the products you add to your cart, and the value of an order you
+          complete. We use this to measure performance, not to identify you
+          personally.
+        </p>
+        <p>
+          You can block these at any time using your browser&apos;s privacy settings,
+          a tracker-blocking extension, or your device&apos;s ad-tracking controls.
+          Blocking them does not affect your ability to browse, order, or pay.
         </p>
       </PolicySection>
 
