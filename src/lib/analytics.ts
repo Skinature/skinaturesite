@@ -38,6 +38,8 @@ type Fbq = {
 declare global {
   interface Window {
     fbq?: Fbq
+    /** fbevents.js looks for this to recognise OUR stub as the active pixel. */
+    _fbq?: Fbq
     gtag?: (...args: unknown[]) => void
     dataLayer?: unknown[]
   }
@@ -76,6 +78,15 @@ export function initTrackers() {
     stub.loaded = true
     stub.version = '2.0'
     window.fbq = stub
+    // REQUIRED, do not remove. fbevents.js uses window._fbq to recognise the
+    // stub that queued the pending calls as its own. Without it, it reports
+    // "Multiple pixels with conflicting versions were detected on this page"
+    // and SILENTLY SENDS NOTHING: the pixel initialises, the instance exists,
+    // and not one event beacon leaves the browser. Missing it cost a live
+    // deploy that looked perfectly healthy while collecting zero data.
+    // Only reproducible against a REAL pixel id, because an unregistered test
+    // id never loads a config and so never hits the conflict path.
+    if (!window._fbq) window._fbq = stub
     stub('init', META_PIXEL_ID)
   }
 
