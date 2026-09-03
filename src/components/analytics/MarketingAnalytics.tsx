@@ -4,8 +4,6 @@ import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import Script from 'next/script'
 import {
-  GA_MEASUREMENT_ID,
-  ga4Enabled,
   initTrackers,
   metaPixelEnabled,
   trackPageView,
@@ -39,13 +37,6 @@ export default function MarketingAnalytics() {
         <Script
           id="meta-pixel-sdk"
           src="https://connect.facebook.net/en_US/fbevents.js"
-          strategy="afterInteractive"
-        />
-      )}
-      {ga4Enabled() && (
-        <Script
-          id="ga4-sdk"
-          src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
           strategy="afterInteractive"
         />
       )}

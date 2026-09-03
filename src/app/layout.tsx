@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Lato, Pinyon_Script } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import SmoothScroll from "@/components/layout/SmoothScroll";
 import CartHydration from "@/components/cart/CartHydration";
@@ -7,6 +8,7 @@ import MarketingAnalytics from "@/components/analytics/MarketingAnalytics";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION, SITE_URL } from "@/lib/data";
+import { GA_MEASUREMENT_ID, ga4Enabled } from "@/lib/analytics";
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
@@ -117,6 +119,27 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${cormorant.variable} ${lato.variable} ${pinyon.variable}`}>
+      <head>
+        {ga4Enabled() && (
+          <>
+            {/* Establish Google's queue before React hydrates. The previous
+                effect-only bootstrap could load gtag.js without ever creating
+                dataLayer/gtag, leaving GA4 at zero events. */}
+            <Script
+              id="ga4-bootstrap"
+              strategy="beforeInteractive"
+              dangerouslySetInnerHTML={{
+                __html: `window.dataLayer=window.dataLayer||[];window.gtag=window.gtag||function(){window.dataLayer.push(arguments)};window.gtag('js',new Date());window.gtag('config',${JSON.stringify(GA_MEASUREMENT_ID)},{send_page_view:false});`,
+              }}
+            />
+            <Script
+              id="ga4-sdk"
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+              strategy="beforeInteractive"
+            />
+          </>
+        )}
+      </head>
       <body className="antialiased bg-cream text-forest-900 font-sans selection:bg-forest-100 selection:text-forest-900">
         <CartHydration />
         <SmoothScroll>
