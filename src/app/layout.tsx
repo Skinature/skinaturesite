@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Lato, Pinyon_Script } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 import SmoothScroll from "@/components/layout/SmoothScroll";
 import CartHydration from "@/components/cart/CartHydration";
@@ -122,20 +121,19 @@ export default function RootLayout({
       <head>
         {ga4Enabled() && (
           <>
-            {/* Establish Google's queue before React hydrates. The previous
-                effect-only bootstrap could load gtag.js without ever creating
-                dataLayer/gtag, leaving GA4 at zero events. */}
-            <Script
+            {/* Native head scripts establish Google's queue before React
+                hydrates. Script scheduling previously left Tag Assistant with
+                no executable Google tag even though gtag.js appeared in HTML. */}
+            <script
               id="ga4-bootstrap"
-              strategy="beforeInteractive"
               dangerouslySetInnerHTML={{
                 __html: `window.dataLayer=window.dataLayer||[];window.gtag=window.gtag||function(){window.dataLayer.push(arguments)};window.gtag('js',new Date());window.gtag('config',${JSON.stringify(GA_MEASUREMENT_ID)},{send_page_view:false});`,
               }}
             />
-            <Script
+            <script
               id="ga4-sdk"
               src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-              strategy="beforeInteractive"
+              async
             />
           </>
         )}
