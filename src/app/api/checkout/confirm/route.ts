@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { finalizePaidOrder } from "@/lib/checkout/finalize";
 import { razorpayEnabled } from "@/lib/razorpay";
+import { browserContextFrom } from "@/lib/meta-capi";
 
 export const runtime = "nodejs";
 
@@ -39,7 +40,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const result = await finalizePaidOrder({ orderId, provider: "mock" });
+  const result = await finalizePaidOrder({
+    orderId,
+    provider: "mock",
+    browser: browserContextFrom(request),
+  });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }

@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { getSupabaseService } from "@/lib/supabase/server";
 import { razorpayEnabled } from "@/lib/razorpay";
 import { finalizePaidOrder } from "@/lib/checkout/finalize";
+import { browserContextFrom } from "@/lib/meta-capi";
 
 export const runtime = "nodejs";
 
@@ -72,6 +73,9 @@ export async function POST(request: Request) {
     provider: "razorpay",
     paymentId: razorpayPaymentId,
     signature: razorpaySignature,
+    // This request comes from the customer's own browser, so its IP, user
+    // agent and Meta cookies identify them for the Conversions API Purchase.
+    browser: browserContextFrom(request),
   });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });

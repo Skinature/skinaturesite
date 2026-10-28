@@ -3,13 +3,15 @@ import { emailEnabled, sendOrderEmails } from '@/lib/email/send'
 import { whatsappEnabled, sendOrderWhatsApp } from '@/lib/whatsapp'
 import { SITE_URL } from '@/lib/data'
 import { renderInvoiceBuffer } from '@/lib/pdf/render'
+import { metaCapiEnabled, sendPurchaseEvent } from '@/lib/meta-capi'
+import type { BrowserContext } from '@/lib/meta-capi'
 import { rowToOrder, rowToSettings, ORDER_SELECT } from '@/lib/db/mappers'
 import type { OrderRow, SettingsRow } from '@/lib/db/mappers'
 
 /**
  * Marks a pending order paid and runs every post-payment side effect exactly once:
- * the atomic status transition, stock decrement, 21-day review invites, and the
- * confirmation email + PDF invoice. Shared by the mock confirm route, the Razorpay
+ * the atomic status transition, stock decrement, 21-day review invites, the
+ * confirmation email + PDF invoice, and the Meta Conversions API Purchase. Shared by the mock confirm route, the Razorpay
  * signature-verify route, and the Razorpay webhook so all three land identical state.
  *
  * Idempotent: the paid transition is guarded by `status = 'pending'`, so whichever
@@ -51,14 +53,16 @@ export async function finalizePaidOrder(params: {
   provider: 'mock' | 'razorpay'
   paymentId?: string | null
   signature?: string | null
+  /** The customer's browser details, for Meta CAPI matching. Absent on webhooks. */
+  browser?: BrowserContext
 }): Promise<FinalizeResult> {
-  const { orderId, provider, paymentId, signature } = params
+  const { orderId, provider, paymentId, signature, browser } = params
   const db = getSupabaseService()
 
   const { data: order, error: orderError } = await db
     .from('orders')
     .select(
-      'id, order_no, status, subtotal_paise, shipping_paise, total_paise, ship_name, ship_line1, ship_line2, ship_city, ship_state, ship_pincode, created_at, customers ( email, full_name, phone ), order_items ( product_id, name_snapshot, qty, unit_price_paise )'
+      'id, order_no, customer_id, status, subtotal_paise, shipping_paise, total_paise, ship_name, ship_line1, ship_line2, ship_city, ship_state, ship_pincode, created_at, customers ( email, full_name, phone ), order_items ( product_id, name_snapshot, qty, unit_price_paise )'
     )
     .eq('id', orderId)
     .maybeSingle()
@@ -161,6 +165,26 @@ export async function finalizePaidOrder(params: {
     )
   }
 
+  // ── Meta Conversions API: the server copy of Purchase, deduped on the order no. ──
+  // Started now and awaited at the end so it runs alongside the slower email.
+  // sendPurchaseEvent never throws; a failure is only logged.
+  const capi = metaCapiEnabled()
+    ? sendPurchaseEvent(
+        {
+          orderNo: snapshot.id,
+          customerId: order.customer_id,
+          customer: snapshot.customer,
+          address: snapshot.address,
+          items: snapshot.items,
+          totalPaise: snapshot.totalPaise,
+        },
+        browser
+      ).then((res) => {
+        if (res.sent) console.log(`[finalize] meta capi purchase sent ${snapshot.id}`)
+        else console.error(`[finalize] meta capi purchase not sent ${snapshot.id}:`, res.reason)
+      })
+    : Promise.resolve()
+
   // ── customer notifications: email + PDF invoice, and the WhatsApp message ──
   // Both are gated and both are wrapped: a notification failure must NEVER fail a
   // paid order (the money is already taken and the DB is already consistent).
@@ -197,6 +221,8 @@ export async function finalizePaidOrder(params: {
       console.error('[finalize] notifications failed:', err)
     }
   }
+
+  await capi
 
   return { ok: true, alreadyPaid: false, order: snapshot }
 }

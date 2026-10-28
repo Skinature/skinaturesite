@@ -193,11 +193,11 @@ export function trackInitiateCheckout(items: TrackedItem[], subtotalPaise: numbe
  * The event that actually matters: it is what Meta optimises ad delivery
  * against and what reports revenue/ROAS back to the ads dashboard.
  *
- * Fired once per order. `orderNo` is passed as Meta's `eventID` so that when
- * the Conversions API is added later (server-side, from finalizePaidOrder),
- * Meta collapses the browser and server copies of the same purchase into one
- * instead of double-counting revenue. GA4 dedupes on `transaction_id` the
- * same way.
+ * Fired once per order. `orderNo` is passed as Meta's `eventID` because the
+ * Conversions API (src/lib/meta-capi.ts, sent from finalizePaidOrder) sends a
+ * server copy of the same Purchase with `event_id = orderNo`, and Meta
+ * collapses the two into one instead of double-counting revenue. Keep both
+ * sides in sync. GA4 dedupes on `transaction_id` the same way.
  */
 export function trackPurchase(orderNo: string, items: TrackedItem[], totalPaise: number) {
   const value = toRupees(totalPaise)
