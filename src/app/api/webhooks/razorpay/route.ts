@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     if (order) {
       // Idempotent: already-paid orders are a no-op. No browser context here:
       // this request is Razorpay's server, not the customer, so the Meta CAPI
-      // Purchase matches on the hashed email/phone/address alone.
+      // Purchase uses the details saved on the order at checkout.
       await finalizePaidOrder({
         orderId: order.id,
         provider: "razorpay",

@@ -1,5 +1,4 @@
 import crypto from 'node:crypto'
-import { SITE_URL } from '@/lib/data'
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Meta Conversions API (CAPI): the server-side copy of the Purchase event.
@@ -35,12 +34,18 @@ const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID
 const TEST_EVENT_CODE = process.env.META_CAPI_TEST_EVENT_CODE
 const GRAPH_VERSION = 'v26.0'
 const TIMEOUT_MS = 5000
+/** The live host (the apex redirects here), so Meta sees only the one domain. */
+const FALLBACK_SOURCE_URL = 'https://www.skinature.org/checkout'
 
 export function metaCapiEnabled(): boolean {
   return Boolean(ACCESS_TOKEN && PIXEL_ID)
 }
 
-/** What only the customer's browser knows, captured on the verify request. */
+/**
+ * What only the customer's browser knows. Captured at /api/checkout and saved on
+ * the order (orders.browser_context), because the Razorpay webhook almost always
+ * finalises before the browser's verify call arrives.
+ */
 export interface BrowserContext {
   ip?: string | null
   userAgent?: string | null
@@ -56,15 +61,22 @@ function readCookie(header: string | null, name: string): string | null {
   if (!header) return null
   for (const part of header.split(';')) {
     const [key, ...rest] = part.trim().split('=')
-    if (key === name) return decodeURIComponent(rest.join('='))
+    if (key !== name) continue
+    const value = rest.join('=')
+    // A malformed cookie must never fail a checkout or payment verify.
+    try {
+      return decodeURIComponent(value)
+    } catch {
+      return value
+    }
   }
   return null
 }
 
 /**
  * Pulls the browser context off an incoming request. Only meaningful for a
- * request the CUSTOMER'S browser made (the Razorpay verify call); a Razorpay
- * webhook would report Razorpay's server instead, so the webhook passes none.
+ * request the CUSTOMER'S browser made (checkout, verify); a Razorpay webhook
+ * would report Razorpay's server instead, so the webhook passes none.
  */
 export function browserContextFrom(request: Request): BrowserContext {
   const h = request.headers
@@ -141,7 +153,7 @@ export function buildPurchaseEvent(purchase: CapiPurchase, browser: BrowserConte
     // MUST equal the browser's eventID (trackPurchase in analytics.ts) for dedup.
     event_id: purchase.orderNo,
     action_source: 'website',
-    event_source_url: browser.sourceUrl || `${SITE_URL}/checkout`,
+    event_source_url: browser.sourceUrl || FALLBACK_SOURCE_URL,
     user_data: userData,
     custom_data: {
       currency: 'INR',

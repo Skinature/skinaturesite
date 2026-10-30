@@ -167,23 +167,8 @@ export async function finalizePaidOrder(params: {
 
   // ── Meta Conversions API: the server copy of Purchase, deduped on the order no. ──
   // Started now and awaited at the end so it runs alongside the slower email.
-  // sendPurchaseEvent never throws; a failure is only logged.
-  const capi = metaCapiEnabled()
-    ? sendPurchaseEvent(
-        {
-          orderNo: snapshot.id,
-          customerId: order.customer_id,
-          customer: snapshot.customer,
-          address: snapshot.address,
-          items: snapshot.items,
-          totalPaise: snapshot.totalPaise,
-        },
-        browser
-      ).then((res) => {
-        if (res.sent) console.log(`[finalize] meta capi purchase sent ${snapshot.id}`)
-        else console.error(`[finalize] meta capi purchase not sent ${snapshot.id}:`, res.reason)
-      })
-    : Promise.resolve()
+  // sendMetaPurchase never throws; a failure is only logged.
+  const capi = sendMetaPurchase(order.id, order.customer_id, snapshot, browser)
 
   // ── customer notifications: email + PDF invoice, and the WhatsApp message ──
   // Both are gated and both are wrapped: a notification failure must NEVER fail a
@@ -225,4 +210,44 @@ export async function finalizePaidOrder(params: {
   await capi
 
   return { ok: true, alreadyPaid: false, order: snapshot }
+}
+
+/**
+ * Sends the Conversions API Purchase using the browser details saved at checkout,
+ * since the Razorpay webhook usually gets here first and has none of its own, then
+ * clears them so customer IPs are not kept longer than needed. The separate read
+ * keeps this column out of the query a paid order depends on.
+ */
+export async function sendMetaPurchase(
+  orderId: string,
+  customerId: string,
+  snapshot: OrderSnapshot,
+  browser?: BrowserContext
+): Promise<void> {
+  try {
+    const db = getSupabaseService()
+    if (metaCapiEnabled()) {
+      const { data } = await db
+        .from('orders')
+        .select('browser_context')
+        .eq('id', orderId)
+        .maybeSingle()
+      const res = await sendPurchaseEvent(
+        {
+          orderNo: snapshot.id,
+          customerId,
+          customer: snapshot.customer,
+          address: snapshot.address,
+          items: snapshot.items,
+          totalPaise: snapshot.totalPaise,
+        },
+        browser ?? (data?.browser_context as BrowserContext | null) ?? undefined
+      )
+      if (res.sent) console.log(`[finalize] meta capi purchase sent ${snapshot.id}`)
+      else console.error(`[finalize] meta capi purchase not sent ${snapshot.id}:`, res.reason)
+    }
+    await db.from('orders').update({ browser_context: null }).eq('id', orderId)
+  } catch (err) {
+    console.error(`[finalize] meta capi purchase failed ${snapshot.id}:`, err)
+  }
 }

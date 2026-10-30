@@ -5,6 +5,8 @@ import { SITE_URL } from "@/lib/data";
 
 export const runtime = "nodejs";
 
+const BROWSER_CONTEXT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
 /**
  * Sends any review invites whose 21-day delay has elapsed and that have not
  * been sent yet. Intended to run daily (Vercel Cron or Supabase pg_cron →
@@ -24,6 +26,17 @@ async function handle(request: Request) {
 
   const db = getSupabaseService();
   const nowIso = new Date().toISOString();
+
+  // Abandoned checkouts never reach finalizePaidOrder, so their saved browser
+  // details (customer IPs) are cleared here instead. 7 days comfortably outlasts
+  // any late payment. Runs before the invites so an early return cannot skip it.
+  const { error: contextError } = await db
+    .from("orders")
+    .update({ browser_context: null })
+    .eq("status", "pending")
+    .not("browser_context", "is", null)
+    .lt("created_at", new Date(Date.now() - BROWSER_CONTEXT_MAX_AGE_MS).toISOString());
+  if (contextError) console.error("[cron] browser context cleanup failed:", contextError.message);
 
   const { data: due, error } = await db
     .from("review_invites")

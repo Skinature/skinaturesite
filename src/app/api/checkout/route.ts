@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseService } from "@/lib/supabase/server";
 import { INDIAN_STATES } from "@/lib/shipping";
 import { razorpayEnabled, razorpayKeyId, getRazorpay } from "@/lib/razorpay";
+import { browserContextFrom } from "@/lib/meta-capi";
 
 export const runtime = "nodejs";
 
@@ -148,6 +149,15 @@ export async function POST(request: Request) {
     await db.from("orders").delete().eq("id", orderRow.id);
     return bad("Could not create order items.", 500);
   }
+
+  // Saved now because this is the customer's own request: the Razorpay webhook
+  // that usually finalises the order has no access to these for the Meta
+  // Conversions API. A failure only weakens ad matching, so it never blocks checkout.
+  const { error: contextError } = await db
+    .from("orders")
+    .update({ browser_context: browserContextFrom(request) })
+    .eq("id", orderRow.id);
+  if (contextError) console.error("[checkout] browser context not saved:", contextError.message);
 
   const totalPaise = subtotalPaise + shippingPaise;
 
