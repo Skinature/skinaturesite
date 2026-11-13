@@ -7,6 +7,12 @@
 export const SHIPPING_TELANGANA_PAISE = 6000
 export const SHIPPING_REST_OF_INDIA_PAISE = 10000
 
+/**
+ * Flat extra charged on Cash on Delivery orders, on top of the order value and
+ * shipping (client decision 2026-11-14). Paying online never carries it.
+ */
+export const COD_FEE_PAISE = 5000
+
 export function shippingPaiseForState(state: string): number {
   return state.trim().toLowerCase() === 'telangana'
     ? SHIPPING_TELANGANA_PAISE

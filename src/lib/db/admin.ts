@@ -61,6 +61,21 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus): P
   if (error) throw error
 }
 
+/**
+ * Records that a Cash on Delivery order's money has been received: the order
+ * becomes Paid and the date is stamped. Returns that timestamp.
+ */
+export async function markCodPaid(orderId: string): Promise<string> {
+  const paidAt = new Date().toISOString()
+  const { error } = await db()
+    .from('orders')
+    .update({ status: 'paid', cod_paid_at: paidAt })
+    .eq('id', orderId)
+    .eq('payment_method', 'cod')
+  if (error) throw error
+  return paidAt
+}
+
 /* ── Products ── */
 
 export async function fetchAdminProducts(): Promise<Product[]> {

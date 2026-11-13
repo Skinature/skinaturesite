@@ -17,20 +17,24 @@ import {
   Check,
   Send,
   RotateCcw,
+  Banknote,
 } from 'lucide-react'
 import {
   fetchAdminOrderByNo,
   updateOrderStatus,
+  markCodPaid,
   fetchInvitesForOrder,
   sendInviteEmailNow,
   restartInviteTimer,
 } from '@/lib/db/admin'
+import { codDue } from '@/lib/domain'
 import type { OrderStatus, ReviewInvite } from '@/lib/domain'
 import { buildOrderWhatsAppUrl } from '@/lib/whatsapp'
 import { formatPaise, formatDate } from '@/lib/format'
 import {
   Card,
   OrderStatusBadge,
+  CodTag,
   AdminField,
   AdminButton,
   adminInputClass,
@@ -44,6 +48,7 @@ const NEXT_STEP: Partial<
   Record<OrderStatus, { to: OrderStatus; label: string; icon: typeof Truck }>
 > = {
   paid: { to: 'shipped', label: 'Mark as Shipped', icon: Truck },
+  cod: { to: 'shipped', label: 'Mark as Shipped', icon: Truck },
   shipped: { to: 'delivered', label: 'Mark as Delivered', icon: PackageCheck },
 }
 
@@ -189,12 +194,17 @@ export default function OrderDetailClient({ orderId: orderNo }: { orderId: strin
     )
   }
 
+  const isCod = order.paymentMethod === 'cod'
+
   const setStatus = async (status: OrderStatus) => {
     setSavingStatus(true)
     const previous = order
-    setData({ ...order, status })
+    // Paid on a COD order means the cash came in, so the date is recorded with it.
+    const cashIn = isCod && status === 'paid' && !order.codPaidAt
+    setData({ ...order, status, codPaidAt: cashIn ? new Date().toISOString() : order.codPaidAt })
     try {
-      await updateOrderStatus(order.id, status)
+      if (cashIn) await markCodPaid(order.id)
+      else await updateOrderStatus(order.id, status)
     } catch {
       setData(previous)
     } finally {
@@ -202,8 +212,12 @@ export default function OrderDetailClient({ orderId: orderNo }: { orderId: strin
     }
   }
 
+  // Confirmed = the order is real (paid online, or a placed COD order).
   const paid = order.status !== 'pending' && order.status !== 'cancelled'
-  const next = NEXT_STEP[order.status]
+  const cashDue = codDue(order)
+  // Once a COD order is Paid the job is finished, so no further step is offered.
+  const next = isCod && order.status === 'paid' ? undefined : NEXT_STEP[order.status]
+  const statuses = isCod ? (['cod', ...STATUSES] as OrderStatus[]) : STATUSES
 
   return (
     <>
@@ -222,6 +236,7 @@ export default function OrderDetailClient({ orderId: orderNo }: { orderId: strin
               {order.orderNo}
             </h1>
             <OrderStatusBadge status={order.status} />
+            {isCod && order.status !== 'cod' && <CodTag due={cashDue} />}
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <a
@@ -288,8 +303,18 @@ export default function OrderDetailClient({ orderId: orderNo }: { orderId: strin
                   {formatPaise(order.shippingPaise)}
                 </dd>
               </div>
+              {order.codFeePaise > 0 && (
+                <div className="flex justify-between">
+                  <dt className="text-forest-900/55">COD charge</dt>
+                  <dd className="text-forest-900 font-medium tabular-nums">
+                    {formatPaise(order.codFeePaise)}
+                  </dd>
+                </div>
+              )}
               <div className="flex justify-between items-baseline pt-2 border-t border-forest-900/10">
-                <dt className="text-forest-900 font-semibold">Total</dt>
+                <dt className="text-forest-900 font-semibold">
+                  {cashDue ? 'Total to collect' : 'Total'}
+                </dt>
                 <dd className="font-serif text-2xl text-forest-900">
                   {formatPaise(order.totalPaise)}
                 </dd>
@@ -304,17 +329,38 @@ export default function OrderDetailClient({ orderId: orderNo }: { orderId: strin
                   Method
                 </dt>
                 <dd className="text-forest-900 font-medium">
-                  {paid ? 'Prepaid' : order.status === 'pending' ? 'Awaiting payment' : 'Not charged'}
+                  {isCod
+                    ? 'Cash on Delivery'
+                    : paid
+                      ? 'Prepaid'
+                      : order.status === 'pending'
+                        ? 'Awaiting payment'
+                        : 'Not charged'}
                 </dd>
               </div>
-              <div>
-                <dt className="text-forest-900/45 text-xs uppercase tracking-[0.1em] mb-1">
-                  Payment ID
-                </dt>
-                <dd className="text-forest-900 font-medium break-all">
-                  {order.paymentId ?? '—'}
-                </dd>
-              </div>
+              {isCod ? (
+                <div>
+                  <dt className="text-forest-900/45 text-xs uppercase tracking-[0.1em] mb-1">
+                    Cash
+                  </dt>
+                  <dd className="text-forest-900 font-medium">
+                    {order.codPaidAt
+                      ? `Received ${formatDate(order.codPaidAt)}`
+                      : order.status === 'cancelled'
+                        ? 'Not collected'
+                        : `${formatPaise(order.totalPaise)} to collect`}
+                  </dd>
+                </div>
+              ) : (
+                <div>
+                  <dt className="text-forest-900/45 text-xs uppercase tracking-[0.1em] mb-1">
+                    Payment ID
+                  </dt>
+                  <dd className="text-forest-900 font-medium break-all">
+                    {order.paymentId ?? '—'}
+                  </dd>
+                </div>
+              )}
               <div>
                 <dt className="text-forest-900/45 text-xs uppercase tracking-[0.1em] mb-1">
                   Invoice No
@@ -361,6 +407,30 @@ export default function OrderDetailClient({ orderId: orderNo }: { orderId: strin
               </p>
             ) : null}
 
+            {cashDue && (
+              <>
+                <AdminButton
+                  onClick={() => setStatus('paid')}
+                  disabled={savingStatus}
+                  variant="outline"
+                  className="w-full mb-2 py-3.5"
+                >
+                  <Banknote size={16} aria-hidden="true" />
+                  Mark as Paid
+                </AdminButton>
+                <p className="text-forest-900/45 text-xs mb-4 leading-relaxed">
+                  Cash on Delivery: use this once the {formatPaise(order.totalPaise)} has
+                  reached your account.
+                </p>
+              </>
+            )}
+            {isCod && order.codPaidAt && (
+              <p className="flex items-center justify-center gap-2 w-full mb-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold uppercase tracking-[0.1em]">
+                <CheckCircle2 size={15} aria-hidden="true" />
+                Cash received
+              </p>
+            )}
+
             <AdminField label="Or set status manually">
               <select
                 value={order.status}
@@ -368,9 +438,9 @@ export default function OrderDetailClient({ orderId: orderNo }: { orderId: strin
                 onChange={(e) => setStatus(e.target.value as OrderStatus)}
                 className={adminInputClass}
               >
-                {STATUSES.map((s) => (
+                {statuses.map((s) => (
                   <option key={s} value={s}>
-                    {s.charAt(0).toUpperCase() + s.slice(1)}
+                    {s === 'cod' ? 'COD (not shipped)' : s.charAt(0).toUpperCase() + s.slice(1)}
                   </option>
                 ))}
               </select>

@@ -7,6 +7,7 @@ import {
   Image,
   StyleSheet,
 } from '@react-pdf/renderer'
+import { codDue } from '@/lib/domain'
 import type { Order, StoreSettings } from '@/lib/domain'
 import { formatDate } from '@/lib/format'
 
@@ -115,6 +116,16 @@ const styles = StyleSheet.create({
   },
   grandLabel: { fontFamily: 'Helvetica-Bold', color: FOREST },
   grandValue: { fontFamily: 'Times-Bold', fontSize: 16, color: FOREST },
+  codNote: {
+    marginTop: 10,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#E6CF9A',
+    backgroundColor: '#FBF4E4',
+    borderRadius: 4,
+    fontSize: 8.5,
+    color: INK,
+  },
   footer: {
     position: 'absolute',
     bottom: 30,
@@ -215,10 +226,26 @@ export function InvoiceDocument({
               <Text style={styles.muted}>Shipping</Text>
               <Text>{rs(order.shippingPaise)}</Text>
             </View>
+            {order.codFeePaise > 0 ? (
+              <View style={styles.totalsRow}>
+                <Text style={styles.muted}>COD charge</Text>
+                <Text>{rs(order.codFeePaise)}</Text>
+              </View>
+            ) : null}
             <View style={styles.grandRow}>
-              <Text style={styles.grandLabel}>Total</Text>
+              <Text style={styles.grandLabel}>{codDue(order) ? 'Total Payable' : 'Total'}</Text>
               <Text style={styles.grandValue}>{rs(order.totalPaise)}</Text>
             </View>
+            {order.paymentMethod === 'cod' ? (
+              <View style={styles.codNote}>
+                <Text style={{ fontFamily: 'Helvetica-Bold', color: FOREST }}>Cash on Delivery</Text>
+                <Text>
+                  {codDue(order)
+                    ? `Not paid yet. ${rs(order.totalPaise)} is payable in cash on delivery.`
+                    : 'Paid in cash on delivery.'}
+                </Text>
+              </View>
+            ) : null}
             {order.paymentId ? (
               <View style={[styles.totalsRow, { marginTop: 4 }]}>
                 <Text style={[styles.muted, { fontSize: 7.5 }]}>Payment ID</Text>

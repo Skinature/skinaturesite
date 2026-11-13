@@ -22,6 +22,9 @@ const order: Order = {
   shippingPaise: 6000,
   totalPaise: 165900,
   status: 'paid',
+  paymentMethod: 'prepaid',
+  codFeePaise: 0,
+  codPaidAt: null,
   paymentId: 'pay_mock_1101x4832',
   invoiceNo: 'INV-2026-1101',
 }

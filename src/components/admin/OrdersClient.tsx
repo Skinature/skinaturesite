@@ -2,26 +2,31 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Search, Download, MessageCircle, FileText } from 'lucide-react'
 import { buildOrderWhatsAppUrl } from '@/lib/whatsapp'
 import { cn } from '@/lib/utils'
 import { fetchAdminOrders } from '@/lib/db/admin'
+import { codDue } from '@/lib/domain'
 import type { OrderStatus } from '@/lib/domain'
 import { formatPaise, formatDate } from '@/lib/format'
 import { toCsv, downloadCsv } from '@/lib/csv'
-import { PageHeader, Card, OrderStatusBadge, AdminButton, adminInputClass } from '@/components/admin/ui'
+import { PageHeader, Card, OrderStatusBadge, CodTag, AdminButton, adminInputClass } from '@/components/admin/ui'
 import { useAsync, AdminLoading, AdminError } from '@/components/admin/useAsync'
 
 const STATUS_FILTERS: { key: OrderStatus | 'all'; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'pending', label: 'Pending' },
   { key: 'paid', label: 'Paid' },
+  // Every Cash on Delivery order whose money is still to come in, shipped or not.
+  { key: 'cod', label: 'COD' },
   { key: 'shipped', label: 'Shipped' },
   { key: 'delivered', label: 'Delivered' },
   { key: 'cancelled', label: 'Cancelled' },
 ]
 
 export default function OrdersClient() {
+  const router = useRouter()
   const { data: orders, error, loading, reload } = useAsync(fetchAdminOrders)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<OrderStatus | 'all'>('all')
@@ -30,7 +35,9 @@ export default function OrdersClient() {
     if (!orders) return []
     const q = query.trim().toLowerCase()
     return orders.filter((o) => {
-      if (status !== 'all' && o.status !== status) return false
+      if (status === 'cod') {
+        if (!codDue(o)) return false
+      } else if (status !== 'all' && o.status !== status) return false
       if (!q) return true
       return [o.orderNo, o.customer.name, o.customer.email, o.customer.phone, o.address.city]
         .join(' ')
@@ -43,8 +50,8 @@ export default function OrdersClient() {
     const csv = toCsv(
       [
         'Order ID', 'Date', 'Customer', 'Email', 'Phone', 'City', 'State',
-        'PIN', 'Items', 'Subtotal (₹)', 'Shipping (₹)', 'Total (₹)', 'Status',
-        'Payment ID', 'Invoice No',
+        'PIN', 'Items', 'Subtotal (₹)', 'Shipping (₹)', 'COD Charge (₹)', 'Total (₹)', 'Status',
+        'Payment Method', 'COD Cash Received', 'Payment ID', 'Invoice No',
       ],
       visible.map((o) => [
         o.orderNo,
@@ -58,8 +65,11 @@ export default function OrdersClient() {
         o.items.map((i) => `${i.name} x ${i.qty}`).join('; '),
         (o.subtotalPaise / 100).toFixed(2),
         (o.shippingPaise / 100).toFixed(2),
+        (o.codFeePaise / 100).toFixed(2),
         (o.totalPaise / 100).toFixed(2),
         o.status,
+        o.paymentMethod === 'cod' ? 'Cash on Delivery' : 'Online',
+        o.paymentMethod === 'cod' ? (o.codPaidAt ? formatDate(o.codPaidAt) : 'Not yet') : '',
         o.paymentId ?? '',
         o.invoiceNo ?? '',
       ])
@@ -143,10 +153,21 @@ export default function OrdersClient() {
               </thead>
               <tbody className="divide-y divide-forest-900/6">
                 {visible.map((order) => (
-                  <tr key={order.id} className="hover:bg-forest-50/50 transition-colors">
+                  // The whole row opens the order. The order number stays a real link
+                  // for keyboard users; the action icons opt out of the row click below.
+                  <tr
+                    key={order.id}
+                    onClick={(e) => {
+                      const href = `/admin/orders/${order.orderNo}`
+                      if (e.metaKey || e.ctrlKey) window.open(href, '_blank', 'noopener')
+                      else router.push(href)
+                    }}
+                    className="hover:bg-forest-50/50 transition-colors cursor-pointer"
+                  >
                     <td className="py-3.5 pr-4">
                       <Link
                         href={`/admin/orders/${order.orderNo}`}
+                        onClick={(e) => e.stopPropagation()}
                         className="font-semibold text-forest-900 hover:text-gold-600 transition-colors"
                       >
                         {order.orderNo}
@@ -169,10 +190,18 @@ export default function OrdersClient() {
                       {formatPaise(order.totalPaise)}
                     </td>
                     <td className="py-3.5 pr-4">
-                      <OrderStatusBadge status={order.status} />
+                      <span className="inline-flex items-center gap-1.5">
+                        <OrderStatusBadge status={order.status} />
+                        {order.paymentMethod === 'cod' && order.status !== 'cod' && (
+                          <CodTag due={codDue(order)} />
+                        )}
+                      </span>
                     </td>
                     <td className="py-3.5">
-                      <div className="flex items-center justify-end gap-1">
+                      <div
+                        className="flex items-center justify-end gap-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <a
                           href={buildOrderWhatsAppUrl(order)}
                           target="_blank"

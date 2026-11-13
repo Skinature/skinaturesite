@@ -63,6 +63,7 @@ const ORDER_STATUS_STYLES: Record<OrderStatus, string> = {
   shipped: 'bg-sky-50 text-sky-800 border-sky-200',
   delivered: 'bg-forest-50 text-forest-800 border-forest-100',
   cancelled: 'bg-red-50 text-red-700 border-red-200',
+  cod: 'bg-orange-50 text-orange-800 border-orange-200',
 }
 
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {
@@ -74,6 +75,25 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }) {
       )}
     >
       {status}
+    </span>
+  )
+}
+
+/**
+ * Marks a Cash on Delivery order once its main badge no longer says COD
+ * (shipped, delivered, paid), and says whether the cash is still to be collected.
+ */
+export function CodTag({ due }: { due: boolean }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center px-2 py-1 rounded-full border text-[0.62rem] font-semibold uppercase tracking-[0.08em] whitespace-nowrap',
+        due
+          ? 'bg-orange-50 text-orange-800 border-orange-200'
+          : 'bg-white text-forest-900/55 border-forest-900/15'
+      )}
+    >
+      {due ? 'COD to collect' : 'COD'}
     </span>
   )
 }

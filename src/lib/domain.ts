@@ -1,6 +1,12 @@
 /** Domain types shared by the storefront, admin, and API routes. */
 
-export type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled'
+/**
+ * 'cod' = a Cash on Delivery order that is confirmed but not dispatched yet.
+ * Prepaid orders never use it.
+ */
+export type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'cod'
+
+export type PaymentMethod = 'prepaid' | 'cod'
 
 export interface OrderItem {
   productId: string | null
@@ -27,10 +33,21 @@ export interface Order {
   items: OrderItem[]
   subtotalPaise: number
   shippingPaise: number
+  /** Includes codFeePaise when the order is Cash on Delivery. */
   totalPaise: number
   status: OrderStatus
+  paymentMethod: PaymentMethod
+  /** Extra charged for Cash on Delivery; 0 on prepaid orders. */
+  codFeePaise: number
+  /** When the admin recorded the COD cash as received; null until then. */
+  codPaidAt: string | null
   paymentId: string | null
   invoiceNo: string | null
+}
+
+/** True while a Cash on Delivery order's money has not reached the business yet. */
+export function codDue(order: Pick<Order, 'paymentMethod' | 'codPaidAt' | 'status'>): boolean {
+  return order.paymentMethod === 'cod' && !order.codPaidAt && order.status !== 'cancelled'
 }
 
 export interface CustomerSummary {

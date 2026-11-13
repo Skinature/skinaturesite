@@ -1,7 +1,6 @@
 import { getSupabaseService } from '@/lib/supabase/server'
 import { emailEnabled, sendOrderEmails } from '@/lib/email/send'
 import { whatsappEnabled, sendOrderWhatsApp } from '@/lib/whatsapp'
-import { SITE_URL } from '@/lib/data'
 import { renderInvoiceBuffer } from '@/lib/pdf/render'
 import { metaCapiEnabled, sendPurchaseEvent } from '@/lib/meta-capi'
 import type { BrowserContext } from '@/lib/meta-capi'
@@ -9,9 +8,10 @@ import { rowToOrder, rowToSettings, ORDER_SELECT } from '@/lib/db/mappers'
 import type { OrderRow, SettingsRow } from '@/lib/db/mappers'
 
 /**
- * Marks a pending order paid and runs every post-payment side effect exactly once:
+ * Confirms a pending order and runs every post-confirmation side effect exactly once:
  * the atomic status transition, stock decrement, 21-day review invites, the
- * confirmation email + PDF invoice, and the Meta Conversions API Purchase. Shared by the mock confirm route, the Razorpay
+ * confirmation email + WhatsApp message (both with the PDF invoice), and the Meta
+ * Conversions API Purchase. Shared by the mock confirm route, the Razorpay
  * signature-verify route, and the Razorpay webhook so all three land identical state.
  *
  * Idempotent: the paid transition is guarded by `status = 'pending'`, so whichever
@@ -19,6 +19,10 @@ import type { OrderRow, SettingsRow } from '@/lib/db/mappers'
  * browser verify, a retry) returns the same snapshot with `alreadyPaid: true` and
  * touches nothing. The invoice number is derived from the order number, so every
  * caller computes the same value.
+ *
+ * Cash on Delivery uses the same path with provider 'cod': the order moves to
+ * status 'cod' instead of 'paid' (no money has been taken yet) and everything else,
+ * including the stock decrement and the notifications, is identical.
  */
 
 const REVIEW_INVITE_DELAY_DAYS = 21
@@ -32,7 +36,10 @@ export interface OrderSnapshot {
   items: { productId: string; name: string; image: string; qty: number; unitPricePaise: number }[]
   subtotalPaise: number
   shippingPaise: number
+  /** Includes codFeePaise on a Cash on Delivery order. */
   totalPaise: number
+  paymentMethod: 'prepaid' | 'cod'
+  codFeePaise: number
   invoiceNo: string
 }
 
@@ -50,7 +57,7 @@ type CustomerJoin = { email: string; full_name: string; phone: string } | null
 
 export async function finalizePaidOrder(params: {
   orderId: string
-  provider: 'mock' | 'razorpay'
+  provider: 'mock' | 'razorpay' | 'cod'
   paymentId?: string | null
   signature?: string | null
   /** The customer's browser details, for Meta CAPI matching. Absent on webhooks. */
@@ -62,7 +69,7 @@ export async function finalizePaidOrder(params: {
   const { data: order, error: orderError } = await db
     .from('orders')
     .select(
-      'id, order_no, customer_id, status, subtotal_paise, shipping_paise, total_paise, ship_name, ship_line1, ship_line2, ship_city, ship_state, ship_pincode, created_at, customers ( email, full_name, phone ), order_items ( product_id, name_snapshot, qty, unit_price_paise )'
+      'id, order_no, customer_id, status, subtotal_paise, shipping_paise, total_paise, payment_method, cod_fee_paise, ship_name, ship_line1, ship_line2, ship_city, ship_state, ship_pincode, created_at, customers ( email, full_name, phone ), order_items ( product_id, name_snapshot, qty, unit_price_paise )'
     )
     .eq('id', orderId)
     .maybeSingle()
@@ -106,7 +113,14 @@ export async function finalizePaidOrder(params: {
     subtotalPaise: order.subtotal_paise,
     shippingPaise: order.shipping_paise,
     totalPaise: order.total_paise,
+    paymentMethod: order.payment_method === 'cod' ? 'cod' : 'prepaid',
+    codFeePaise: order.cod_fee_paise ?? 0,
     invoiceNo,
+  }
+
+  // A payment can only settle a prepaid order, and only checkout can confirm a COD one.
+  if ((order.payment_method === 'cod') !== (provider === 'cod')) {
+    return { ok: false, status: 409, error: 'Payment method does not match this order.' }
   }
 
   // Already finalized (a webhook after browser verify, a retry, etc.) → no side effects.
@@ -117,14 +131,14 @@ export async function finalizePaidOrder(params: {
     return { ok: true, alreadyPaid: true, order: snapshot }
   }
 
-  // ── atomic paid transition (only one caller wins the pending → paid flip) ──
+  // ── atomic transition (only one caller wins the pending → paid/cod flip) ──
   const resolvedPaymentId =
     paymentId ?? (provider === 'mock' ? `pay_mock_${order.order_no.replace('SKN-', '')}` : null)
 
   const { data: transitioned, error: updateError } = await db
     .from('orders')
     .update({
-      status: 'paid',
+      status: provider === 'cod' ? 'cod' : 'paid',
       payment_provider: provider,
       payment_id: resolvedPaymentId,
       razorpay_signature: signature ?? null,
@@ -182,10 +196,11 @@ export async function finalizePaidOrder(params: {
       if (fullOrder && settingsRow) {
         const domainOrder = rowToOrder(fullOrder as unknown as OrderRow)
         const settings = rowToSettings(settingsRow as SettingsRow)
+        // One PDF, attached to both the email and the WhatsApp message.
+        const pdf = await renderInvoiceBuffer(domainOrder, settings)
 
         if (emailEnabled()) {
           try {
-            const pdf = await renderInvoiceBuffer(domainOrder, settings)
             await sendOrderEmails(domainOrder, settings, pdf)
           } catch (err) {
             console.error('[finalize] order email failed:', err)
@@ -194,9 +209,9 @@ export async function finalizePaidOrder(params: {
 
         if (whatsappEnabled()) {
           try {
-            const invoiceUrl = `${SITE_URL}/checkout/success?order=${domainOrder.orderNo}`
-            const res = await sendOrderWhatsApp(domainOrder, invoiceUrl)
-            if (!res.sent) console.error('[finalize] whatsapp not sent:', res.reason)
+            const res = await sendOrderWhatsApp(domainOrder, pdf)
+            if (res.sent) console.log('[finalize] whatsapp sent', domainOrder.orderNo)
+            else console.error('[finalize] whatsapp not sent:', domainOrder.orderNo, res.reason)
           } catch (err) {
             console.error('[finalize] whatsapp failed:', err)
           }

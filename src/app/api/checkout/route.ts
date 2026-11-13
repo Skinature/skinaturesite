@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSupabaseService } from "@/lib/supabase/server";
-import { INDIAN_STATES } from "@/lib/shipping";
+import { INDIAN_STATES, COD_FEE_PAISE } from "@/lib/shipping";
 import { razorpayEnabled, razorpayKeyId, getRazorpay } from "@/lib/razorpay";
 import { browserContextFrom } from "@/lib/meta-capi";
+import { finalizePaidOrder } from "@/lib/checkout/finalize";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,9 @@ export const runtime = "nodejs";
  * When Razorpay is configured, this route also creates the matching Razorpay
  * order and returns the fields the browser checkout needs; otherwise it returns
  * the plain order and the client falls back to the mock payment sheet.
+ *
+ * Cash on Delivery skips the gateway: the order is confirmed in this same request
+ * (status 'cod') with the flat COD charge added, and the confirmed order is returned.
  */
 
 interface CheckoutItem {
@@ -29,6 +33,8 @@ interface CheckoutBody {
     state: string;
     pincode: string;
   };
+  /** Defaults to prepaid, so older clients keep working unchanged. */
+  paymentMethod?: "prepaid" | "cod";
 }
 
 function bad(message: string, status = 400) {
@@ -44,6 +50,9 @@ export async function POST(request: Request) {
   }
 
   const { items, customer, address } = body ?? {};
+  const paymentMethod = body?.paymentMethod ?? "prepaid";
+  if (paymentMethod !== "prepaid" && paymentMethod !== "cod") return bad("Invalid payment method.");
+  const isCod = paymentMethod === "cod";
 
   // ── validation (mirrors the client, enforced server-side) ──
   if (!Array.isArray(items) || items.length === 0) return bad("Cart is empty.");
@@ -109,6 +118,8 @@ export async function POST(request: Request) {
     address.state.trim().toLowerCase() === "telangana"
       ? settings?.shipping_telangana_paise ?? 6000
       : settings?.shipping_rest_paise ?? 10000;
+  const codFeePaise = isCod ? COD_FEE_PAISE : 0;
+  const totalPaise = subtotalPaise + shippingPaise + codFeePaise;
 
   // ── customer upsert ──
   const email = customer.email.trim().toLowerCase();
@@ -130,7 +141,9 @@ export async function POST(request: Request) {
       status: "pending",
       subtotal_paise: subtotalPaise,
       shipping_paise: shippingPaise,
-      total_paise: subtotalPaise + shippingPaise,
+      total_paise: totalPaise,
+      payment_method: paymentMethod,
+      cod_fee_paise: codFeePaise,
       ship_name: customer.fullName.trim(),
       ship_line1: address.line1.trim(),
       ship_line2: address.line2?.trim() || null,
@@ -159,7 +172,27 @@ export async function POST(request: Request) {
     .eq("id", orderRow.id);
   if (contextError) console.error("[checkout] browser context not saved:", contextError.message);
 
-  const totalPaise = subtotalPaise + shippingPaise;
+  // ── Cash on Delivery: no gateway, confirm now ──
+  if (isCod) {
+    const result = await finalizePaidOrder({
+      orderId: orderRow.id,
+      provider: "cod",
+      browser: browserContextFrom(request),
+    });
+    if (!result.ok) {
+      await db.from("orders").delete().eq("id", orderRow.id).eq("status", "pending");
+      return bad("Could not place your order. Please try again.", 500);
+    }
+    return NextResponse.json({
+      orderId: orderRow.id,
+      orderNo: orderRow.order_no,
+      subtotalPaise,
+      shippingPaise,
+      codFeePaise,
+      totalPaise,
+      order: result.order,
+    });
+  }
 
   // ── Razorpay order (when configured); otherwise the client uses the mock sheet ──
   if (razorpayEnabled()) {

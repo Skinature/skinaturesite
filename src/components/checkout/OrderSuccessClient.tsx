@@ -33,6 +33,9 @@ interface StoredOrder {
   subtotalPaise: number
   shippingPaise: number
   totalPaise: number
+  /** Absent on orders stored before Cash on Delivery existed. */
+  paymentMethod?: 'prepaid' | 'cod'
+  codFeePaise?: number
 }
 
 const noopSubscribe = () => () => {}
@@ -116,6 +119,8 @@ export default function OrderSuccessClient() {
     )
   }
 
+  const isCod = order.paymentMethod === 'cod'
+
   return (
     <>
       <Navbar />
@@ -150,6 +155,13 @@ export default function OrderSuccessClient() {
             <p className="mt-4 inline-block bg-white border border-forest-900/10 rounded-full px-5 py-2 text-sm text-forest-900 font-semibold tracking-wide">
               Order {order.id}
             </p>
+            {isCod && (
+              <p className="mt-5 mx-auto max-w-md rounded-2xl bg-gold-500/10 border border-gold-500/30 px-5 py-4 text-sm text-forest-900 leading-relaxed">
+                <strong className="font-semibold">Cash on Delivery.</strong> Please keep{' '}
+                <strong className="font-semibold">{formatPaise(order.totalPaise)}</strong> ready
+                to pay when your order arrives.
+              </p>
+            )}
           </motion.div>
 
           {/* What happens next */}
@@ -163,7 +175,7 @@ export default function OrderSuccessClient() {
               {
                 icon: Mail,
                 title: 'Confirmation Email',
-                desc: `Invoice sent to ${order.customer.email}`,
+                desc: `${isCod ? 'Order details' : 'Invoice'} sent to ${order.customer.email}`,
               },
               {
                 icon: PackageCheck,
@@ -239,8 +251,18 @@ export default function OrderSuccessClient() {
                   {formatPaise(order.shippingPaise)}
                 </dd>
               </div>
+              {isCod && (order.codFeePaise ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <dt className="text-forest-900/60">COD charge</dt>
+                  <dd className="font-medium text-forest-900 tabular-nums">
+                    {formatPaise(order.codFeePaise ?? 0)}
+                  </dd>
+                </div>
+              )}
               <div className="flex justify-between items-baseline border-t border-forest-900/10 pt-4 mt-4">
-                <dt className="text-forest-900 font-semibold">Total Paid</dt>
+                <dt className="text-forest-900 font-semibold">
+                  {isCod ? 'Pay on Delivery' : 'Total Paid'}
+                </dt>
                 <dd className="font-serif text-2xl text-forest-900">
                   {formatPaise(order.totalPaise)}
                 </dd>

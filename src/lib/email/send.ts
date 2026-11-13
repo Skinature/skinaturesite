@@ -66,11 +66,14 @@ export async function sendOrderEmails(
 ): Promise<SendResult> {
   const tx = getTransport()
   if (!tx || !FROM) return { skipped: true }
+  const cod = order.paymentMethod === 'cod'
 
   await tx.sendMail({
     from: FROM,
     to: order.customer.email,
-    subject: `Your Skinature order ${order.orderNo} is confirmed`,
+    subject: cod
+      ? `Your Skinature order ${order.orderNo} is confirmed | Pay ${formatPaise(order.totalPaise)} on delivery`
+      : `Your Skinature order ${order.orderNo} is confirmed`,
     html: customerConfirmationHtml(order),
     attachments: pdf
       ? [
@@ -88,7 +91,9 @@ export async function sendOrderEmails(
     await tx.sendMail({
       from: FROM,
       to: adminTo,
-      subject: `New order ${order.orderNo} · ${formatPaise(order.totalPaise)}`,
+      subject: cod
+        ? `New COD order ${order.orderNo} · ${formatPaise(order.totalPaise)} to collect`
+        : `New order ${order.orderNo} · ${formatPaise(order.totalPaise)}`,
       html: adminNotificationHtml(order),
     })
   }

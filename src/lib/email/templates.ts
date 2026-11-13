@@ -1,3 +1,4 @@
+import { codDue } from '@/lib/domain'
 import type { Order } from '@/lib/domain'
 import { formatPaise, formatDate } from '@/lib/format'
 
@@ -47,19 +48,40 @@ function totalsBlock(order: Order): string {
   return `
     <table style="width:100%;border-collapse:collapse;margin-top:8px;">
       <tr><td style="padding:4px 0;color:${MUTED};font-size:13px;">Subtotal</td><td style="padding:4px 0;text-align:right;font-size:13px;">${formatPaise(order.subtotalPaise)}</td></tr>
-      <tr><td style="padding:4px 0;color:${MUTED};font-size:13px;">Shipping</td><td style="padding:4px 0;text-align:right;font-size:13px;">${formatPaise(order.shippingPaise)}</td></tr>
-      <tr><td style="padding:10px 0 0;border-top:1px solid #EDEBE3;font-weight:bold;color:${FOREST};">Total</td><td style="padding:10px 0 0;border-top:1px solid #EDEBE3;text-align:right;font-weight:bold;font-size:18px;color:${FOREST};">${formatPaise(order.totalPaise)}</td></tr>
+      <tr><td style="padding:4px 0;color:${MUTED};font-size:13px;">Shipping</td><td style="padding:4px 0;text-align:right;font-size:13px;">${formatPaise(order.shippingPaise)}</td></tr>${
+        order.codFeePaise > 0
+          ? `
+      <tr><td style="padding:4px 0;color:${MUTED};font-size:13px;">COD charge</td><td style="padding:4px 0;text-align:right;font-size:13px;">${formatPaise(order.codFeePaise)}</td></tr>`
+          : ''
+      }
+      <tr><td style="padding:10px 0 0;border-top:1px solid #EDEBE3;font-weight:bold;color:${FOREST};">${codDue(order) ? 'Total, payable on delivery' : 'Total'}</td><td style="padding:10px 0 0;border-top:1px solid #EDEBE3;text-align:right;font-weight:bold;font-size:18px;color:${FOREST};">${formatPaise(order.totalPaise)}</td></tr>
     </table>`
+}
+
+/** The highlighted "pay on arrival" notice shown on every Cash on Delivery email. */
+function codNotice(text: string): string {
+  return `
+    <div style="background:#FBF4E4;border:1px solid #E6CF9A;border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:14px;line-height:1.6;color:${INK};">
+      <strong style="color:${FOREST};">Cash on Delivery</strong><br/>${text}
+    </div>`
 }
 
 export function customerConfirmationHtml(order: Order): string {
   const first = order.customer.name.split(' ')[0]
+  const cod = order.paymentMethod === 'cod'
   const inner = `
     <h1 style="font-family:Georgia,serif;font-size:24px;color:${FOREST};margin:0 0 4px;">Order confirmed</h1>
     <p style="color:${MUTED};font-size:14px;margin:0 0 20px;">Thank you, ${escapeHtml(first)}. Nature is on its way.</p>
     <div style="background:${CREAM};border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;">
       <strong>Order ${order.orderNo}</strong> · ${formatDate(order.createdAt)}${order.invoiceNo ? ` · Invoice ${order.invoiceNo}` : ''}
     </div>
+    ${
+      cod
+        ? codNotice(
+            `No payment has been taken yet. Please keep <strong>${formatPaise(order.totalPaise)}</strong> ready to pay in cash when your order arrives.`
+          )
+        : ''
+    }
     <table style="width:100%;border-collapse:collapse;">${itemRows(order)}</table>
     ${totalsBlock(order)}
     <div style="margin-top:20px;padding-top:16px;border-top:1px solid #EDEBE3;font-size:13px;color:${MUTED};line-height:1.6;">
@@ -74,8 +96,15 @@ export function customerConfirmationHtml(order: Order): string {
 
 export function adminNotificationHtml(order: Order): string {
   const inner = `
-    <h1 style="font-family:Georgia,serif;font-size:22px;color:${FOREST};margin:0 0 12px;">New order · ${order.orderNo}</h1>
+    <h1 style="font-family:Georgia,serif;font-size:22px;color:${FOREST};margin:0 0 12px;">New ${order.paymentMethod === 'cod' ? 'COD ' : ''}order · ${order.orderNo}</h1>
     <p style="font-size:14px;margin:0 0 16px;"><strong style="color:${GOLD};font-size:18px;">${formatPaise(order.totalPaise)}</strong> from ${escapeHtml(order.customer.name)}</p>
+    ${
+      order.paymentMethod === 'cod'
+        ? codNotice(
+            `Not paid yet. <strong>${formatPaise(order.totalPaise)}</strong> is to be collected from the customer on delivery.`
+          )
+        : ''
+    }
     <table style="width:100%;border-collapse:collapse;">${itemRows(order)}</table>
     ${totalsBlock(order)}
     <div style="margin-top:16px;font-size:13px;color:${MUTED};line-height:1.6;">

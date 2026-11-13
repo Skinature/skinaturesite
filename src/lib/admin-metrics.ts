@@ -6,8 +6,18 @@
 import type { Order, OrderStatus } from '@/lib/domain'
 import type { Product } from '@/lib/data'
 
-/** Statuses that count as realised revenue. */
+/** Statuses that count as realised revenue on a prepaid order. */
 const REVENUE_STATUSES: OrderStatus[] = ['paid', 'shipped', 'delivered']
+
+/**
+ * Whether the money for this order has actually reached the business. A Cash on
+ * Delivery order counts only once the admin records the cash as received, however
+ * far along its delivery is.
+ */
+export function countsAsRevenue(order: Order): boolean {
+  if (order.paymentMethod === 'cod') return Boolean(order.codPaidAt) && order.status !== 'cancelled'
+  return REVENUE_STATUSES.includes(order.status)
+}
 
 /** The mock dataset's "today" (newest order date). */
 export function anchorDate(orders: Order[]): Date {
@@ -44,7 +54,7 @@ export function revenueByDay(orders: Order[], days = 30): DayPoint[] {
   const index = new Map(points.map((p) => [p.date, p]))
 
   for (const order of orders) {
-    if (!REVENUE_STATUSES.includes(order.status)) continue
+    if (!countsAsRevenue(order)) continue
     const key = order.createdAt.slice(0, 10)
     const point = index.get(key)
     if (point) {
@@ -76,7 +86,7 @@ export function kpis(orders: Order[], days = 30): Kpis {
   for (const order of orders) {
     const t = new Date(order.createdAt).getTime()
     if (order.status === 'pending') pending += 1
-    if (!REVENUE_STATUSES.includes(order.status)) continue
+    if (!countsAsRevenue(order)) continue
     if (t > windowStart) {
       revenue += order.totalPaise
       count += 1
@@ -107,7 +117,7 @@ export interface ProductStat {
 export function topProducts(orders: Order[]): ProductStat[] {
   const byId = new Map<string, ProductStat>()
   for (const order of orders) {
-    if (!REVENUE_STATUSES.includes(order.status)) continue
+    if (!countsAsRevenue(order)) continue
     for (const item of order.items) {
       const key = item.productId ?? item.name
       const existing = byId.get(key)
@@ -136,7 +146,7 @@ export function regionSplit(orders: Order[]): Split[] {
   let telangana = 0
   let rest = 0
   for (const order of orders) {
-    if (!REVENUE_STATUSES.includes(order.status)) continue
+    if (!countsAsRevenue(order)) continue
     if (order.address.state === 'Telangana') telangana += 1
     else rest += 1
   }
@@ -150,7 +160,7 @@ export function categorySplit(orders: Order[], products: Product[]): Split[] {
   const categoryById = new Map(products.map((p) => [p.id, p.category]))
   const byCategory = new Map<string, number>()
   for (const order of orders) {
-    if (!REVENUE_STATUSES.includes(order.status)) continue
+    if (!countsAsRevenue(order)) continue
     for (const item of order.items) {
       const category = (item.productId && categoryById.get(item.productId)) ?? 'Other'
       byCategory.set(category, (byCategory.get(category) ?? 0) + item.lineTotalPaise)

@@ -36,10 +36,10 @@ export default function AnalyticsClient() {
   const statusCounts = useMemo(() => {
     const counts = new Map<string, number>()
     for (const o of orders) counts.set(o.status, (counts.get(o.status) ?? 0) + 1)
-    return ['delivered', 'shipped', 'paid', 'pending', 'cancelled']
+    return ['delivered', 'shipped', 'paid', 'cod', 'pending', 'cancelled']
       .filter((s) => counts.has(s))
       .map((s) => ({
-        label: s.charAt(0).toUpperCase() + s.slice(1),
+        label: s === 'cod' ? 'COD' : s.charAt(0).toUpperCase() + s.slice(1),
         value: counts.get(s) ?? 0,
         display: String(counts.get(s) ?? 0),
       }))

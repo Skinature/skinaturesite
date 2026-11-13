@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { fetchAdminOrderByNo, fetchAdminSettings } from '@/lib/db/admin'
+import { codDue } from '@/lib/domain'
 import { formatPaise, formatDate } from '@/lib/format'
 import { AdminButton } from '@/components/admin/ui'
 import { useAsync, AdminLoading, AdminError } from '@/components/admin/useAsync'
@@ -179,12 +180,30 @@ export default function InvoiceClient({ orderId: orderNo }: { orderId: string })
                 {formatPaise(order.shippingPaise)}
               </dd>
             </div>
+            {order.codFeePaise > 0 && (
+              <div className="flex justify-between">
+                <dt className="text-forest-900/55">COD charge</dt>
+                <dd className="text-forest-900 font-medium tabular-nums">
+                  {formatPaise(order.codFeePaise)}
+                </dd>
+              </div>
+            )}
             <div className="flex justify-between items-baseline pt-3 border-t border-forest-900/10">
-              <dt className="text-forest-900 font-semibold">Total</dt>
+              <dt className="text-forest-900 font-semibold">
+                {codDue(order) ? 'Total Payable' : 'Total'}
+              </dt>
               <dd className="font-serif text-2xl text-forest-900 tabular-nums">
                 {formatPaise(order.totalPaise)}
               </dd>
             </div>
+            {order.paymentMethod === 'cod' && (
+              <p className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-forest-900 leading-relaxed">
+                <strong className="font-semibold">Cash on Delivery.</strong>{' '}
+                {codDue(order)
+                  ? `Not paid yet. ${formatPaise(order.totalPaise)} is payable in cash on delivery.`
+                  : 'Paid in cash on delivery.'}
+              </p>
+            )}
             {order.paymentId && (
               <div className="flex justify-between pt-2">
                 <dt className="text-forest-900/45 text-xs">Payment ID</dt>

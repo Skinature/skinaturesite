@@ -5,13 +5,13 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ShieldCheck, Lock, X, CheckCircle2, XCircle } from 'lucide-react'
+import { ShieldCheck, Lock, X, CheckCircle2, XCircle, CreditCard, Banknote } from 'lucide-react'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { cn } from '@/lib/utils'
 import { useCart, cartSubtotalPaise } from '@/store/cart'
 import { formatPaise } from '@/lib/format'
-import { INDIAN_STATES, shippingPaiseForState } from '@/lib/shipping'
+import { INDIAN_STATES, shippingPaiseForState, COD_FEE_PAISE } from '@/lib/shipping'
 import { trackInitiateCheckout } from '@/lib/analytics'
 
 interface RazorpayCheckout {
@@ -28,7 +28,11 @@ interface PendingOrder {
   totalPaise: number
   /** Present only when Razorpay is configured; absent → mock payment sheet. */
   razorpay?: RazorpayCheckout
+  /** Present only for Cash on Delivery: the order is already confirmed. */
+  order?: unknown
 }
+
+type PaymentMethod = 'prepaid' | 'cod'
 
 interface RazorpayHandlerResponse {
   razorpay_payment_id: string
@@ -172,10 +176,13 @@ export default function CheckoutClient() {
   const [verifying, setVerifying] = useState(false)
   const [apiError, setApiError] = useState('')
   const [pendingOrder, setPendingOrder] = useState<PendingOrder | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('prepaid')
 
+  const isCod = paymentMethod === 'cod'
   const subtotal = cartSubtotalPaise(items)
   const shipping = form.state ? shippingPaiseForState(form.state) : null
-  const total = subtotal + (shipping ?? 0)
+  const codFee = isCod ? COD_FEE_PAISE : 0
+  const total = subtotal + (shipping ?? 0) + codFee
 
   const set = (key: keyof FormState) => (value: string) => {
     setForm((f) => ({ ...f, [key]: value }))
@@ -215,6 +222,7 @@ export default function CheckoutClient() {
             state: form.state,
             pincode: form.pincode.trim(),
           },
+          paymentMethod,
         }),
       })
       const data = (await res.json()) as PendingOrder & { error?: string }
@@ -235,7 +243,12 @@ export default function CheckoutClient() {
         })),
         data.subtotalPaise
       )
-      if (data.razorpay) {
+      if (data.order) {
+        // Cash on Delivery: confirmed by the server already, nothing to pay now.
+        sessionStorage.setItem('skinature-last-order', JSON.stringify(data.order))
+        clear()
+        router.push('/checkout/success')
+      } else if (data.razorpay) {
         // Real gateway: open the Razorpay checkout modal.
         await openRazorpay(data)
       } else {
@@ -520,6 +533,101 @@ export default function CheckoutClient() {
                   </div>
                 </div>
               </section>
+
+              {/* Payment method */}
+              <section aria-labelledby="payment-heading">
+                <h2
+                  id="payment-heading"
+                  className="font-serif text-2xl text-forest-900 mb-5"
+                >
+                  Payment Method
+                </h2>
+                <div role="radiogroup" aria-labelledby="payment-heading" className="space-y-3">
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={!isCod}
+                    onClick={() => setPaymentMethod('prepaid')}
+                    className={cn(
+                      'w-full text-left rounded-2xl border px-5 py-4 flex items-start gap-4 transition-colors',
+                      !isCod
+                        ? 'border-forest-900 bg-white shadow-[0_4px_20px_rgba(26,60,52,0.08)]'
+                        : 'border-forest-900/15 bg-white/60 hover:border-forest-900/40'
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'mt-1 w-4 h-4 rounded-full border flex-shrink-0 flex items-center justify-center',
+                        !isCod ? 'border-forest-900' : 'border-forest-900/30'
+                      )}
+                    >
+                      {!isCod && <span className="w-2 h-2 rounded-full bg-forest-900" />}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="flex items-center flex-wrap gap-x-3 gap-y-1.5">
+                        <span className="flex items-center gap-2 text-forest-900 font-semibold text-sm">
+                          <CreditCard size={16} strokeWidth={1.75} aria-hidden="true" />
+                          Pay Online
+                        </span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-forest-900 text-cream text-[0.65rem] font-semibold uppercase tracking-[0.1em]">
+                          Save {formatPaise(COD_FEE_PAISE)}
+                        </span>
+                      </span>
+                      <span className="block text-forest-900/55 text-xs mt-1.5 leading-relaxed">
+                        UPI, Cards, Netbanking, Wallets. No extra charges.
+                      </span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={isCod}
+                    onClick={() => setPaymentMethod('cod')}
+                    className={cn(
+                      'w-full text-left rounded-2xl border px-5 py-4 flex items-start gap-4 transition-colors',
+                      isCod
+                        ? 'border-gold-500 bg-white shadow-[0_4px_20px_rgba(197,160,89,0.18)]'
+                        : 'border-forest-900/15 bg-white/60 hover:border-forest-900/40'
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'mt-1 w-4 h-4 rounded-full border flex-shrink-0 flex items-center justify-center',
+                        isCod ? 'border-forest-900' : 'border-forest-900/30'
+                      )}
+                    >
+                      {isCod && <span className="w-2 h-2 rounded-full bg-forest-900" />}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="flex items-center flex-wrap gap-x-3 gap-y-1.5">
+                        <span className="flex items-center gap-2 text-forest-900 font-semibold text-sm">
+                          <Banknote size={16} strokeWidth={1.75} aria-hidden="true" />
+                          Cash on Delivery
+                        </span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-gold-500/15 text-forest-900 border border-gold-500/50 text-[0.65rem] font-semibold uppercase tracking-[0.1em]">
+                          + {formatPaise(COD_FEE_PAISE)}
+                        </span>
+                      </span>
+                      <span className="block text-forest-900/55 text-xs mt-1.5 leading-relaxed">
+                        Pay in cash when your order arrives. A {formatPaise(COD_FEE_PAISE)} COD charge applies.
+                      </span>
+                    </span>
+                  </button>
+                </div>
+
+                {isCod && (
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('prepaid')}
+                    className="mt-4 w-full text-left rounded-xl bg-gold-500/10 border border-gold-500/30 px-4 py-3 text-sm text-forest-900 font-medium hover:bg-gold-500/15 transition-colors"
+                  >
+                    Switch to online payment and skip the {formatPaise(COD_FEE_PAISE)} COD charge.
+                  </button>
+                )}
+              </section>
             </div>
 
             {/* Summary */}
@@ -576,10 +684,20 @@ export default function CheckoutClient() {
                       )}
                     </dd>
                   </div>
+                  {isCod && (
+                    <div className="flex justify-between -mx-3 px-3 py-2 rounded-lg bg-gold-500/10">
+                      <dt className="text-forest-900 font-semibold">COD charge</dt>
+                      <dd className="font-semibold text-forest-900 tabular-nums">
+                        {formatPaise(codFee)}
+                      </dd>
+                    </div>
+                  )}
                 </dl>
 
-                <div className="border-t border-forest-900/10 mt-5 pt-5 flex justify-between items-baseline mb-6">
-                  <span className="text-forest-900 font-semibold">Total</span>
+                <div className="border-t border-forest-900/10 mt-5 pt-5 flex justify-between items-baseline gap-4 mb-6">
+                  <span className="text-forest-900 font-semibold">
+                    {isCod ? 'Total, payable on delivery' : 'Total'}
+                  </span>
                   <span className="font-serif text-3xl text-forest-900">
                     {formatPaise(total)}
                   </span>
@@ -605,7 +723,12 @@ export default function CheckoutClient() {
                         className="w-4 h-4 border-2 border-cream/30 border-t-cream rounded-full animate-spin"
                         aria-hidden="true"
                       />
-                      Preparing Order...
+                      {isCod ? 'Placing Order...' : 'Preparing Order...'}
+                    </>
+                  ) : isCod ? (
+                    <>
+                      <Banknote size={15} strokeWidth={2} aria-hidden="true" />
+                      Place COD Order
                     </>
                   ) : (
                     <>
@@ -615,9 +738,11 @@ export default function CheckoutClient() {
                   )}
                 </button>
 
-                <p className="flex items-center justify-center gap-2 text-forest-900/45 text-xs mt-4">
-                  <ShieldCheck size={14} aria-hidden="true" />
-                  Secure prepaid payment via UPI, cards, netbanking
+                <p className="flex items-center justify-center gap-2 text-forest-900/45 text-xs mt-4 text-center">
+                  <ShieldCheck size={14} className="flex-shrink-0" aria-hidden="true" />
+                  {isCod
+                    ? `Pay ${formatPaise(total)} in cash when your order arrives`
+                    : 'Secure online payment via UPI, cards, netbanking'}
                 </p>
               </div>
             </aside>

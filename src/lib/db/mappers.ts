@@ -3,6 +3,7 @@ import type {
   Order,
   OrderItem,
   OrderStatus,
+  PaymentMethod,
   Review,
   ReviewStatus,
   ReviewInvite,
@@ -61,6 +62,9 @@ export interface OrderRow {
   subtotal_paise: number
   shipping_paise: number
   total_paise: number
+  payment_method: PaymentMethod
+  cod_fee_paise: number
+  cod_paid_at: string | null
   ship_name: string
   ship_line1: string
   ship_line2: string | null
@@ -164,6 +168,9 @@ export function rowToOrder(row: OrderRow): Order {
     shippingPaise: row.shipping_paise,
     totalPaise: row.total_paise,
     status: row.status,
+    paymentMethod: row.payment_method ?? 'prepaid',
+    codFeePaise: row.cod_fee_paise ?? 0,
+    codPaidAt: row.cod_paid_at ?? null,
     paymentId: row.payment_id,
     invoiceNo: row.invoice_no,
   }
@@ -226,4 +233,4 @@ export function productPatchToRow(patch: Partial<Product>): Record<string, unkno
 }
 
 export const ORDER_SELECT =
-  'id, order_no, status, subtotal_paise, shipping_paise, total_paise, ship_name, ship_line1, ship_line2, ship_city, ship_state, ship_pincode, payment_id, invoice_no, created_at, customers ( email, full_name, phone ), order_items ( product_id, name_snapshot, qty, unit_price_paise, line_total_paise )'
+  'id, order_no, status, subtotal_paise, shipping_paise, total_paise, payment_method, cod_fee_paise, cod_paid_at, ship_name, ship_line1, ship_line2, ship_city, ship_state, ship_pincode, payment_id, invoice_no, created_at, customers ( email, full_name, phone ), order_items ( product_id, name_snapshot, qty, unit_price_paise, line_total_paise )'
