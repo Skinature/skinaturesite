@@ -94,12 +94,6 @@ export async function insertAdminProduct(product: Omit<Product, 'id'>): Promise<
   if (error) throw error
 }
 
-export async function adjustAdminStock(id: string, currentStock: number, delta: number): Promise<void> {
-  const next = Math.max(0, currentStock + delta)
-  const { error } = await db().from('products').update({ stock: next }).eq('id', id)
-  if (error) throw error
-}
-
 /* ── Reviews ── */
 
 export async function fetchAdminReviews(): Promise<{ reviews: Review[]; productNames: Record<string, string> }> {

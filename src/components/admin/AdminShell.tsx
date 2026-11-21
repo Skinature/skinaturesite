@@ -9,7 +9,6 @@ import type { Session } from '@supabase/supabase-js'
 import {
   LayoutDashboard,
   Package,
-  Boxes,
   Users,
   Star,
   BarChart3,
@@ -27,7 +26,6 @@ const NAV = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
   { href: '/admin/products', label: 'Products', icon: Package },
-  { href: '/admin/inventory', label: 'Inventory', icon: Boxes },
   { href: '/admin/customers', label: 'Customers', icon: Users },
   { href: '/admin/reviews', label: 'Reviews', icon: Star },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },

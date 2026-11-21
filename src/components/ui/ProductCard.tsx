@@ -16,7 +16,6 @@ export function ProductCard({
   className?: string
 }) {
   const add = useCart((s) => s.add)
-  const outOfStock = product.stock <= 0
 
   return (
     <Link
@@ -37,11 +36,6 @@ export function ProductCard({
             Sale
           </span>
         )}
-        {outOfStock && (
-          <span className="absolute bottom-4 left-4 bg-forest-900/85 text-cream text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full z-10">
-            Out of Stock
-          </span>
-        )}
         <Image
           src={product.image}
           alt={`${product.name}, ${product.benefit}`}
@@ -58,20 +52,18 @@ export function ProductCard({
         />
 
         {/* Quick add */}
-        {!outOfStock && (
-          <div className="absolute bottom-4 right-4 md:translate-y-10 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 transition-all duration-500 delay-100">
-            <button
-              aria-label={`Add ${product.name} to cart`}
-              className="bg-white text-forest-900 rounded-full w-11 h-11 flex items-center justify-center shadow-md hover:bg-forest-900 hover:text-white transition-colors"
-              onClick={(e) => {
-                e.preventDefault()
-                add(product)
-              }}
-            >
-              <Plus size={18} strokeWidth={2} aria-hidden="true" />
-            </button>
-          </div>
-        )}
+        <div className="absolute bottom-4 right-4 md:translate-y-10 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 transition-all duration-500 delay-100">
+          <button
+            aria-label={`Add ${product.name} to cart`}
+            className="bg-white text-forest-900 rounded-full w-11 h-11 flex items-center justify-center shadow-md hover:bg-forest-900 hover:text-white transition-colors"
+            onClick={(e) => {
+              e.preventDefault()
+              add(product)
+            }}
+          >
+            <Plus size={18} strokeWidth={2} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <div className="p-6 text-center transition-transform duration-500 group-hover:-translate-y-1 bg-white relative z-20">

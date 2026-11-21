@@ -71,8 +71,6 @@ export default function ProductDetailClient({
   const add = useCart((s) => s.add)
 
   const price = effectivePricePaise(product)
-  const outOfStock = product.stock <= 0
-  const lowStock = !outOfStock && product.stock <= 10
 
   // Meta ViewContent / GA4 view_item, once per product viewed.
   //
@@ -302,23 +300,11 @@ export default function ProductDetailClient({
 
                 <button
                   onClick={addToCart}
-                  disabled={outOfStock}
-                  className={cn(
-                    'flex-1 rounded-full text-xs md:text-sm uppercase tracking-[0.2em] font-medium transition-all duration-400',
-                    outOfStock
-                      ? 'bg-forest-900/10 text-forest-900/40 cursor-not-allowed'
-                      : 'bg-forest-900 text-cream hover:bg-forest-800 hover:shadow-[inset_0_0_0_1px_rgba(197,160,89,0.55),0_8px_30px_rgba(26,60,52,0.25)]'
-                  )}
+                  className="flex-1 rounded-full text-xs md:text-sm uppercase tracking-[0.2em] font-medium transition-all duration-400 bg-forest-900 text-cream hover:bg-forest-800 hover:shadow-[inset_0_0_0_1px_rgba(197,160,89,0.55),0_8px_30px_rgba(26,60,52,0.25)]"
                 >
-                  {outOfStock ? 'Out of Stock' : 'Add to Cart'}
+                  Add to Cart
                 </button>
               </div>
-
-              {lowStock && (
-                <p className="text-gold-600 text-xs uppercase tracking-[0.15em] font-semibold mb-6">
-                  Only {product.stock} left in stock
-                </p>
-              )}
 
               {/* Trust strip */}
               <div className="grid grid-cols-4 gap-2 py-6 border-y border-forest-900/10 mb-8">
@@ -468,15 +454,9 @@ export default function ProductDetailClient({
         </div>
         <button
           onClick={addToCart}
-          disabled={outOfStock}
-          className={cn(
-            'px-7 py-3 rounded-full text-xs uppercase tracking-[0.15em] font-medium transition-colors flex-shrink-0',
-            outOfStock
-              ? 'bg-forest-900/10 text-forest-900/40'
-              : 'bg-forest-900 text-cream hover:bg-forest-800'
-          )}
+          className="px-7 py-3 rounded-full text-xs uppercase tracking-[0.15em] font-medium transition-colors flex-shrink-0 bg-forest-900 text-cream hover:bg-forest-800"
         >
-          {outOfStock ? 'Out of Stock' : 'Add to Cart'}
+          Add to Cart
         </button>
       </div>
 

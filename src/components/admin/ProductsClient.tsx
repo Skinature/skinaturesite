@@ -28,7 +28,6 @@ interface FormState {
   category: Category
   priceRupees: string
   saleRupees: string
-  stock: string
   badge: string
   benefit: string
   description: string
@@ -42,7 +41,6 @@ function productToForm(p: Product): FormState {
     category: p.category,
     priceRupees: String(p.pricePaise / 100),
     saleRupees: p.salePricePaise !== null ? String(p.salePricePaise / 100) : '',
-    stock: String(p.stock),
     badge: p.badge ?? '',
     benefit: p.benefit,
     description: p.description,
@@ -56,7 +54,6 @@ const EMPTY_FORM: FormState = {
   category: 'Skin Care',
   priceRupees: '',
   saleRupees: '',
-  stock: '0',
   badge: '',
   benefit: '',
   description: '',
@@ -105,16 +102,12 @@ export default function ProductsClient() {
       return setError('Sale price must be a valid amount, or left empty.')
     if (sale !== null && sale >= price)
       return setError('Sale price must be lower than the regular price.')
-    const stock = parseInt(form.stock, 10)
-    if (!Number.isFinite(stock) || stock < 0)
-      return setError('Stock must be 0 or more.')
 
     const patch = {
       name: form.name.trim(),
       category: form.category,
       pricePaise: price,
       salePricePaise: sale,
-      stock,
       badge: form.badge.trim() || undefined,
       benefit: form.benefit.trim(),
       description: form.description.trim(),
@@ -135,6 +128,8 @@ export default function ProductsClient() {
           ritual: '',
           benefits: '',
           sortOrder: (products?.length ?? 0) + 1,
+          // Stock is no longer tracked; the column only needs a value.
+          stock: 0,
           ...patch,
         })
       } else if (editing) {
@@ -156,7 +151,7 @@ export default function ProductsClient() {
     <>
       <PageHeader
         title="Products"
-        description="Manage the catalog: pricing, sale prices, stock, and visibility."
+        description="Manage the catalog: pricing, sale prices, and visibility."
         actions={
           <AdminButton onClick={openNew}>
             <Plus size={14} aria-hidden="true" />
@@ -174,7 +169,6 @@ export default function ProductsClient() {
                 <th className="py-3 pr-4 font-semibold">Category</th>
                 <th className="py-3 pr-4 font-semibold">Price</th>
                 <th className="py-3 pr-4 font-semibold">Sale Price</th>
-                <th className="py-3 pr-4 font-semibold">Stock</th>
                 <th className="py-3 pr-4 font-semibold">Status</th>
                 <th className="py-3 font-semibold text-right">Edit</th>
               </tr>
@@ -217,20 +211,6 @@ export default function ProductsClient() {
                     ) : (
                       <span className="text-forest-900/30">—</span>
                     )}
-                  </td>
-                  <td className="py-3.5 pr-4">
-                    <span
-                      className={cn(
-                        'tabular-nums font-medium',
-                        p.stock === 0
-                          ? 'text-red-600'
-                          : p.stock <= 10
-                            ? 'text-amber-700'
-                            : 'text-forest-900'
-                      )}
-                    >
-                      {p.stock}
-                    </span>
                   </td>
                   <td className="py-3.5 pr-4">
                     <span
@@ -361,16 +341,7 @@ export default function ProductsClient() {
                   </AdminField>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <AdminField label="Stock">
-                    <input
-                      type="number"
-                      min="0"
-                      value={form.stock}
-                      onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
-                      className={adminInputClass}
-                    />
-                  </AdminField>
+                <div>
                   <AdminField label="Benefit line">
                     <input
                       value={form.benefit}

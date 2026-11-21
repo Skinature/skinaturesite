@@ -9,7 +9,7 @@ import type { OrderRow, SettingsRow } from '@/lib/db/mappers'
 
 /**
  * Confirms a pending order and runs every post-confirmation side effect exactly once:
- * the atomic status transition, stock decrement, 21-day review invites, the
+ * the atomic status transition, 21-day review invites, the
  * confirmation email + WhatsApp message (both with the PDF invoice), and the Meta
  * Conversions API Purchase. Shared by the mock confirm route, the Razorpay
  * signature-verify route, and the Razorpay webhook so all three land identical state.
@@ -22,7 +22,7 @@ import type { OrderRow, SettingsRow } from '@/lib/db/mappers'
  *
  * Cash on Delivery uses the same path with provider 'cod': the order moves to
  * status 'cod' instead of 'paid' (no money has been taken yet) and everything else,
- * including the stock decrement and the notifications, is identical.
+ * including the notifications, is identical.
  */
 
 const REVIEW_INVITE_DELAY_DAYS = 21
@@ -80,11 +80,11 @@ export async function finalizePaidOrder(params: {
   const items = (order.order_items ?? []) as ItemRow[]
   const customer = order.customers as unknown as CustomerJoin
 
-  // Product images for the confirmation snapshot (also gives us stock for the decrement).
+  // Product images for the confirmation snapshot.
   const productIds = [...new Set(items.map((i) => i.product_id).filter(Boolean))] as string[]
   const { data: productRows } = await db
     .from('products')
-    .select('id, stock, image')
+    .select('id, image')
     .in('id', productIds)
   const productInfo = new Map((productRows ?? []).map((p) => [p.id, p]))
 
@@ -153,18 +153,6 @@ export async function finalizePaidOrder(params: {
   // Lost the race: another caller already finalized. Return the same snapshot, no side effects.
   if (!transitioned || transitioned.length === 0) {
     return { ok: true, alreadyPaid: true, order: snapshot }
-  }
-
-  // ── decrement stock ──
-  for (const item of items) {
-    if (!item.product_id) continue
-    const info = productInfo.get(item.product_id)
-    if (info) {
-      await db
-        .from('products')
-        .update({ stock: Math.max(0, info.stock - item.qty) })
-        .eq('id', item.product_id)
-    }
   }
 
   // ── review invites (auto-sent by scheduler 21 days after order, per DECISIONS §6.7) ──

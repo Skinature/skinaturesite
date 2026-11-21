@@ -34,6 +34,9 @@ interface PendingOrder {
 
 type PaymentMethod = 'prepaid' | 'cod'
 
+// Cash on Delivery is picked out in terracotta (#B4531A, tint #FBEDE2, border #E7B894)
+// so it reads as different from the forest green of everything else. Client request.
+
 interface RazorpayHandlerResponse {
   razorpay_payment_id: string
   razorpay_order_id: string
@@ -588,7 +591,7 @@ export default function CheckoutClient() {
                     className={cn(
                       'w-full text-left rounded-2xl border px-5 py-4 flex items-start gap-4 transition-colors',
                       isCod
-                        ? 'border-gold-500 bg-white shadow-[0_4px_20px_rgba(197,160,89,0.18)]'
+                        ? 'border-[#B4531A] bg-white shadow-[0_4px_20px_rgba(180,83,26,0.12)]'
                         : 'border-forest-900/15 bg-white/60 hover:border-forest-900/40'
                     )}
                   >
@@ -603,11 +606,11 @@ export default function CheckoutClient() {
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className="flex items-center flex-wrap gap-x-3 gap-y-1.5">
-                        <span className="flex items-center gap-2 text-forest-900 font-semibold text-sm">
+                        <span className="flex items-center gap-2 text-[#B4531A] font-semibold text-sm">
                           <Banknote size={16} strokeWidth={1.75} aria-hidden="true" />
                           Cash on Delivery
                         </span>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-gold-500/15 text-forest-900 border border-gold-500/50 text-[0.65rem] font-semibold uppercase tracking-[0.1em]">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#FBEDE2] text-[#B4531A] border border-[#E7B894] text-[0.65rem] font-semibold uppercase tracking-[0.1em]">
                           + {formatPaise(COD_FEE_PAISE)}
                         </span>
                       </span>
@@ -685,9 +688,9 @@ export default function CheckoutClient() {
                     </dd>
                   </div>
                   {isCod && (
-                    <div className="flex justify-between -mx-3 px-3 py-2 rounded-lg bg-gold-500/10">
-                      <dt className="text-forest-900 font-semibold">COD charge</dt>
-                      <dd className="font-semibold text-forest-900 tabular-nums">
+                    <div className="flex justify-between -mx-3 px-3 py-2 rounded-lg bg-[#FBEDE2]">
+                      <dt className="text-[#B4531A] font-semibold">COD charge</dt>
+                      <dd className="font-semibold text-[#B4531A] tabular-nums">
                         {formatPaise(codFee)}
                       </dd>
                     </div>

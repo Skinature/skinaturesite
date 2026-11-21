@@ -96,10 +96,7 @@ export default async function ProductPage({ params }: Props) {
               "@type": "Offer",
               price: (effectivePricePaise(product) / 100).toFixed(2),
               priceCurrency: "INR",
-              availability:
-                product.stock > 0
-                  ? "https://schema.org/InStock"
-                  : "https://schema.org/OutOfStock",
+              availability: "https://schema.org/InStock",
               url: `${SITE_URL}/product/${product.slug}`,
             },
             aggregateRating: {

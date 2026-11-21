@@ -9,7 +9,8 @@ export const runtime = "nodejs";
 
 /**
  * Creates a pending order with server-computed totals.
- * The client's cart is advisory; prices, stock, and shipping come from the DB.
+ * The client's cart is advisory; prices and shipping come from the DB. Stock is
+ * never checked: the business fulfils from offline stock and must not lose a sale.
  * When Razorpay is configured, this route also creates the matching Razorpay
  * order and returns the fields the browser checkout needs; otherwise it returns
  * the plain order and the client falls back to the mock payment sheet.
@@ -72,11 +73,11 @@ export async function POST(request: Request) {
 
   const db = getSupabaseService();
 
-  // ── price + stock from the database ──
+  // ── prices from the database ──
   const ids = [...new Set(items.map((i) => i.productId))];
   const { data: productRows, error: productsError } = await db
     .from("products")
-    .select("id, name, price_paise, sale_price_paise, stock, is_active")
+    .select("id, name, price_paise, sale_price_paise, is_active")
     .in("id", ids);
   if (productsError) return bad("Could not load products.", 500);
 
@@ -94,9 +95,6 @@ export async function POST(request: Request) {
     const product = products.get(item.productId);
     if (!product || !product.is_active) {
       return bad("One of the products is no longer available.", 409);
-    }
-    if (product.stock < item.qty) {
-      return bad(`Only ${product.stock} left of ${product.name}.`, 409);
     }
     const unit = product.sale_price_paise ?? product.price_paise;
     subtotalPaise += unit * item.qty;
