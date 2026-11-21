@@ -417,6 +417,102 @@ export default function CheckoutClient() {
           <form onSubmit={placeOrder} noValidate className="grid grid-cols-1 lg:grid-cols-5 gap-10">
             {/* Form */}
             <div className="lg:col-span-3 space-y-10">
+              {/* Payment method: first, so the COD option and its extra charge are
+                  seen before any details are filled in (client request 2026-11-21) */}
+              <section aria-labelledby="payment-heading">
+                <h2
+                  id="payment-heading"
+                  className="font-serif text-2xl text-forest-900 mb-5"
+                >
+                  Payment Method
+                </h2>
+                <div role="radiogroup" aria-labelledby="payment-heading" className="space-y-3">
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={!isCod}
+                    onClick={() => setPaymentMethod('prepaid')}
+                    className={cn(
+                      'w-full text-left rounded-2xl border px-5 py-4 flex items-start gap-4 transition-colors',
+                      !isCod
+                        ? 'border-forest-900 bg-white shadow-[0_4px_20px_rgba(26,60,52,0.08)]'
+                        : 'border-forest-900/15 bg-white/60 hover:border-forest-900/40'
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'mt-1 w-4 h-4 rounded-full border flex-shrink-0 flex items-center justify-center',
+                        !isCod ? 'border-forest-900' : 'border-forest-900/30'
+                      )}
+                    >
+                      {!isCod && <span className="w-2 h-2 rounded-full bg-forest-900" />}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="flex items-center flex-wrap gap-x-3 gap-y-1.5">
+                        <span className="flex items-center gap-2 text-forest-900 font-semibold text-sm">
+                          <CreditCard size={16} strokeWidth={1.75} aria-hidden="true" />
+                          Pay Online
+                        </span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-forest-900 text-cream text-[0.65rem] font-semibold uppercase tracking-[0.1em]">
+                          Save {formatPaise(COD_FEE_PAISE)}
+                        </span>
+                      </span>
+                      <span className="block text-forest-900/55 text-xs mt-1.5 leading-relaxed">
+                        UPI, Cards, Netbanking, Wallets. No extra charges.
+                      </span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={isCod}
+                    onClick={() => setPaymentMethod('cod')}
+                    className={cn(
+                      'w-full text-left rounded-2xl border px-5 py-4 flex items-start gap-4 transition-colors',
+                      isCod
+                        ? 'border-[#B4531A] bg-white shadow-[0_4px_20px_rgba(180,83,26,0.12)]'
+                        : 'border-forest-900/15 bg-white/60 hover:border-forest-900/40'
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'mt-1 w-4 h-4 rounded-full border flex-shrink-0 flex items-center justify-center',
+                        isCod ? 'border-forest-900' : 'border-forest-900/30'
+                      )}
+                    >
+                      {isCod && <span className="w-2 h-2 rounded-full bg-forest-900" />}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="flex items-center flex-wrap gap-x-3 gap-y-1.5">
+                        <span className="flex items-center gap-2 text-[#B4531A] font-semibold text-sm">
+                          <Banknote size={16} strokeWidth={1.75} aria-hidden="true" />
+                          Cash on Delivery
+                        </span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#FBEDE2] text-[#B4531A] border border-[#E7B894] text-[0.65rem] font-semibold uppercase tracking-[0.1em]">
+                          + {formatPaise(COD_FEE_PAISE)}
+                        </span>
+                      </span>
+                      <span className="block text-forest-900/55 text-xs mt-1.5 leading-relaxed">
+                        Pay in cash when your order arrives. A {formatPaise(COD_FEE_PAISE)} COD charge applies.
+                      </span>
+                    </span>
+                  </button>
+                </div>
+
+                {isCod && (
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('prepaid')}
+                    className="mt-4 w-full text-left rounded-xl bg-gold-500/10 border border-gold-500/30 px-4 py-3 text-sm text-forest-900 font-medium hover:bg-gold-500/15 transition-colors"
+                  >
+                    Switch to online payment and skip the {formatPaise(COD_FEE_PAISE)} COD charge.
+                  </button>
+                )}
+              </section>
+
               {/* Contact */}
               <section aria-labelledby="contact-heading">
                 <h2
@@ -535,101 +631,6 @@ export default function CheckoutClient() {
                     </Field>
                   </div>
                 </div>
-              </section>
-
-              {/* Payment method */}
-              <section aria-labelledby="payment-heading">
-                <h2
-                  id="payment-heading"
-                  className="font-serif text-2xl text-forest-900 mb-5"
-                >
-                  Payment Method
-                </h2>
-                <div role="radiogroup" aria-labelledby="payment-heading" className="space-y-3">
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={!isCod}
-                    onClick={() => setPaymentMethod('prepaid')}
-                    className={cn(
-                      'w-full text-left rounded-2xl border px-5 py-4 flex items-start gap-4 transition-colors',
-                      !isCod
-                        ? 'border-forest-900 bg-white shadow-[0_4px_20px_rgba(26,60,52,0.08)]'
-                        : 'border-forest-900/15 bg-white/60 hover:border-forest-900/40'
-                    )}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        'mt-1 w-4 h-4 rounded-full border flex-shrink-0 flex items-center justify-center',
-                        !isCod ? 'border-forest-900' : 'border-forest-900/30'
-                      )}
-                    >
-                      {!isCod && <span className="w-2 h-2 rounded-full bg-forest-900" />}
-                    </span>
-                    <span className="flex-1 min-w-0">
-                      <span className="flex items-center flex-wrap gap-x-3 gap-y-1.5">
-                        <span className="flex items-center gap-2 text-forest-900 font-semibold text-sm">
-                          <CreditCard size={16} strokeWidth={1.75} aria-hidden="true" />
-                          Pay Online
-                        </span>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-forest-900 text-cream text-[0.65rem] font-semibold uppercase tracking-[0.1em]">
-                          Save {formatPaise(COD_FEE_PAISE)}
-                        </span>
-                      </span>
-                      <span className="block text-forest-900/55 text-xs mt-1.5 leading-relaxed">
-                        UPI, Cards, Netbanking, Wallets. No extra charges.
-                      </span>
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={isCod}
-                    onClick={() => setPaymentMethod('cod')}
-                    className={cn(
-                      'w-full text-left rounded-2xl border px-5 py-4 flex items-start gap-4 transition-colors',
-                      isCod
-                        ? 'border-[#B4531A] bg-white shadow-[0_4px_20px_rgba(180,83,26,0.12)]'
-                        : 'border-forest-900/15 bg-white/60 hover:border-forest-900/40'
-                    )}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        'mt-1 w-4 h-4 rounded-full border flex-shrink-0 flex items-center justify-center',
-                        isCod ? 'border-forest-900' : 'border-forest-900/30'
-                      )}
-                    >
-                      {isCod && <span className="w-2 h-2 rounded-full bg-forest-900" />}
-                    </span>
-                    <span className="flex-1 min-w-0">
-                      <span className="flex items-center flex-wrap gap-x-3 gap-y-1.5">
-                        <span className="flex items-center gap-2 text-[#B4531A] font-semibold text-sm">
-                          <Banknote size={16} strokeWidth={1.75} aria-hidden="true" />
-                          Cash on Delivery
-                        </span>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#FBEDE2] text-[#B4531A] border border-[#E7B894] text-[0.65rem] font-semibold uppercase tracking-[0.1em]">
-                          + {formatPaise(COD_FEE_PAISE)}
-                        </span>
-                      </span>
-                      <span className="block text-forest-900/55 text-xs mt-1.5 leading-relaxed">
-                        Pay in cash when your order arrives. A {formatPaise(COD_FEE_PAISE)} COD charge applies.
-                      </span>
-                    </span>
-                  </button>
-                </div>
-
-                {isCod && (
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('prepaid')}
-                    className="mt-4 w-full text-left rounded-xl bg-gold-500/10 border border-gold-500/30 px-4 py-3 text-sm text-forest-900 font-medium hover:bg-gold-500/15 transition-colors"
-                  >
-                    Switch to online payment and skip the {formatPaise(COD_FEE_PAISE)} COD charge.
-                  </button>
-                )}
               </section>
             </div>
 
