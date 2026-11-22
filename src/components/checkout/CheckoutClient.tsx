@@ -416,10 +416,12 @@ export default function CheckoutClient() {
 
           <form onSubmit={placeOrder} noValidate className="grid grid-cols-1 lg:grid-cols-5 gap-10">
             {/* Form */}
-            <div className="lg:col-span-3 space-y-10">
-              {/* Payment method: first, so the COD option and its extra charge are
-                  seen before any details are filled in (client request 2026-11-21) */}
-              <section aria-labelledby="payment-heading">
+            <div className="lg:col-span-3 flex flex-col gap-10">
+              {/* Payment method. Desktop: first, so the COD option and its charge sit
+                  in the opening view next to the order summary. Mobile: after the
+                  address (order-last), the layout the client asked to keep. One block
+                  of markup, placed by CSS order (client feedback 2026-11-23). */}
+              <section aria-labelledby="payment-heading" className="order-last lg:order-none">
                 <h2
                   id="payment-heading"
                   className="font-serif text-2xl text-forest-900 mb-5"
