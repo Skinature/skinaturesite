@@ -8,43 +8,72 @@ import { Volume2, VolumeX, ArrowUpRight } from 'lucide-react'
 /**
  * Video showcase (reference: dyou.co's autoplaying vertical video strip).
  * The three how-to films play muted on scroll-into-view; tap to unmute.
+ *
+ * BANDWIDTH: a video gets its src only once its card is close to the viewport.
+ * Before this, every home page visit downloaded all three files (86% of the
+ * site's data transfer), including visitors who never scrolled this far. Do not
+ * put the src back on the element unconditionally. Until then a small poster
+ * frame (public/posters, lazy-loaded) fills the card.
  */
 
 const VIDEOS = [
   {
     src: '/New Product Mockups Latest/Root Revival Hair Mask and Cocktail Video.mp4',
+    poster: '/posters/root-revival-hair-mask-and-cocktail.webp',
     title: 'The Hair Mask Ritual',
     href: '/product/root-revival-hair-mask-cocktail',
   },
   {
     src: '/New Product Mockups Latest/Brightening and Cleansing Mask Video.mp4',
+    poster: '/posters/brightening-and-cleansing-mask.webp',
     title: 'The Glow Ritual',
     href: '/product/brightening-cleansing-mask',
   },
   {
     src: '/New Product Mockups Latest/Root Revival Hair Oil Video.mp4',
+    poster: '/posters/root-revival-hair-oil.webp',
     title: 'The Root Revival Oil',
     href: '/product/root-revival-hair-oil',
   },
 ]
 
-function VideoCard({ src, title, href, index }: (typeof VIDEOS)[number] & { index: number }) {
+function VideoCard({ src, poster, title, href, index }: (typeof VIDEOS)[number] & { index: number }) {
   const ref = useRef<HTMLVideoElement>(null)
   const [muted, setMuted] = useState(true)
+  // near: the card is within a screen of the viewport, so fetch the file.
+  // inView: enough of the card is visible to play it.
+  const [near, setNear] = useState(false)
+  const [inView, setInView] = useState(false)
 
   useEffect(() => {
     const v = ref.current
     if (!v) return
-    const io = new IntersectionObserver(
+    const loadIo = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) v.play().catch(() => {})
-        else v.pause()
+        if (entry.isIntersecting) {
+          setNear(true)
+          loadIo.disconnect()
+        }
       },
-      { threshold: 0.35 }
+      { rootMargin: '300px 0px' }
     )
-    io.observe(v)
-    return () => io.disconnect()
+    const playIo = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), {
+      threshold: 0.35,
+    })
+    loadIo.observe(v)
+    playIo.observe(v)
+    return () => {
+      loadIo.disconnect()
+      playIo.disconnect()
+    }
   }, [])
+
+  useEffect(() => {
+    const v = ref.current
+    if (!v || !near) return
+    if (inView) v.play().catch(() => {})
+    else v.pause()
+  }, [near, inView])
 
   return (
     <motion.div
@@ -54,13 +83,21 @@ function VideoCard({ src, title, href, index }: (typeof VIDEOS)[number] & { inde
       transition={{ duration: 0.8, delay: index * 0.12 }}
       className="group relative aspect-[9/16] rounded-[1.75rem] overflow-hidden bg-forest-950 shadow-[0_24px_50px_-20px_rgba(42,62,44,0.4)]"
     >
+      {/* eslint-disable-next-line @next/next/no-img-element -- tiny pre-sized poster, not worth an optimizer call */}
+      <img
+        src={poster}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="absolute inset-0 w-full h-full object-cover"
+      />
       <video
         ref={ref}
-        src={src}
+        src={near ? src : undefined}
         muted={muted}
         loop
         playsInline
-        preload="metadata"
+        preload="none"
         className="absolute inset-0 w-full h-full object-cover"
         aria-label={title}
       />
