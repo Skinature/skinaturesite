@@ -94,6 +94,19 @@ export async function POST(request: Request) {
   for (const entry of body.entry ?? []) {
     for (const change of entry.changes ?? []) {
       const value = change.value;
+      // One line per event so a missing auto-reply can be explained from the Vercel
+      // logs. No phone numbers or message text: only the shape of the event.
+      console.log(
+        "[whatsapp] event",
+        JSON.stringify({
+          field: change.field,
+          numberIdMatch: value?.metadata?.phone_number_id === ourNumberId,
+          gotIdLen: value?.metadata?.phone_number_id?.length ?? 0,
+          ourIdLen: ourNumberId?.length ?? 0,
+          messages: (value?.messages ?? []).map((m) => ({ type: m.type, hasFrom: Boolean(m.from) })),
+          statuses: (value?.statuses ?? []).map((st) => st.status),
+        })
+      );
       // Only events for our own sending number.
       if (!value || change.field !== "messages" || value.metadata?.phone_number_id !== ourNumberId) {
         continue;
@@ -116,13 +129,18 @@ export async function POST(request: Request) {
         if (!message.from || message.type === "reaction" || message.type === "system") continue;
         const now = Date.now();
         const last = lastReplyAt.get(message.from);
-        if (last && now - last < AUTO_REPLY_GAP_MS) continue;
+        if (last && now - last < AUTO_REPLY_GAP_MS) {
+          console.log("[whatsapp] auto-reply skipped (already sent recently) for", mask(message.from));
+          continue;
+        }
 
         const res = await sendAutoReply(message.from);
         // Only a reply that went out starts the quiet period; a failed one is retried
         // on the customer's next message.
-        if (res.sent) lastReplyAt.set(message.from, now);
-        else console.error("[whatsapp] auto-reply not sent to", mask(message.from), res.reason);
+        if (res.sent) {
+          lastReplyAt.set(message.from, now);
+          console.log("[whatsapp] auto-reply sent to", mask(message.from));
+        } else console.error("[whatsapp] auto-reply not sent to", mask(message.from), res.reason);
       }
     }
   }
